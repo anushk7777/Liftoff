@@ -1,21 +1,16 @@
-export type TaskType = 'dsa' | 'course' | 'milestone';
+// =========================================================================
+// LIFTOFF — Data types & seed content
+// =========================================================================
 
+export type TaskType = 'dsa' | 'course' | 'milestone' | 'project' | 'apply';
+
+// ---- Roadmap (long-horizon plan) ----------------------------------------
 export interface Task {
   id: string;
   title: string;
   type: TaskType;
   completed: boolean;
   link?: string;
-}
-
-export interface DailyTask {
-  id: string;
-  title: string;
-  category: string;
-  duration: string;
-  completed: boolean;
-  date: string; // ISO date string (start of day)
-  createdAt: string;
 }
 
 export interface Week {
@@ -31,6 +26,65 @@ export interface Phase {
   weeks: Week[];
 }
 
+// ---- Full task manager --------------------------------------------------
+export type Priority = 'low' | 'medium' | 'high';
+export type Status = 'todo' | 'doing' | 'done';
+
+export interface TodoTask {
+  id: string;
+  title: string;
+  notes?: string;
+  priority: Priority;
+  status: Status;
+  category?: string;
+  estimate?: string; // e.g. "30m", "2h"
+  dueDate?: string; // ISO start-of-day, optional
+  createdAt: string;
+  completedAt?: string;
+}
+
+// ---- Brain dump (quick capture) -----------------------------------------
+export interface Idea {
+  id: string;
+  text: string;
+  createdAt: string;
+  archived: boolean;
+}
+
+// ---- Notes (longer documents) -------------------------------------------
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  pinned: boolean;
+}
+
+// ---- Focus / Pomodoro ---------------------------------------------------
+export interface FocusSession {
+  id: string;
+  date: string; // ISO datetime
+  durationMins: number;
+  kind: 'focus' | 'break';
+  taskTitle?: string;
+}
+
+export interface PomodoroSettings {
+  focusMins: number;
+  shortBreakMins: number;
+  longBreakMins: number;
+  roundsBeforeLong: number;
+}
+
+export const defaultPomodoro: PomodoroSettings = {
+  focusMins: 25,
+  shortBreakMins: 5,
+  longBreakMins: 15,
+  roundsBeforeLong: 4,
+};
+
+// ---- Seed roadmap -------------------------------------------------------
 export const initialRoadmap: Phase[] = [
   {
     id: 'phase-a',
@@ -43,7 +97,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't1', title: 'Before web dev journey', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't2', title: 'Arrays basics', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w2',
@@ -51,7 +105,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't3', title: 'Basics of web development & HTML', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't4', title: 'Sorting', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w3',
@@ -59,7 +113,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't5', title: 'Learn about CSS', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't6', title: 'Hashing', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w4',
@@ -67,10 +121,10 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't7', title: 'Learn Tailwind CSS', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't8', title: 'Two-pointer & Sliding Window', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-          { id: 'm1', title: 'Build & deploy 1 static responsive page to Vercel', type: 'milestone', completed: false }
-        ]
-      }
-    ]
+          { id: 'm1', title: 'Build & deploy 1 static responsive page to Vercel', type: 'milestone', completed: false },
+        ],
+      },
+    ],
   },
   {
     id: 'phase-b',
@@ -83,7 +137,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't9', title: 'Learn JS Foundation (deep)', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't10', title: 'Recursion', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w6',
@@ -91,7 +145,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't11', title: 'DOM manipulation & Events', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't12', title: 'Binary Search', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w7',
@@ -99,7 +153,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't13', title: 'Asynchronous JS (Promises)', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't14', title: 'Linked Lists', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w8',
@@ -107,10 +161,10 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't15', title: 'Async/Await & Fetch API', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't16', title: 'Stacks & Queues', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-          { id: 'm2', title: 'Build a vanilla-JS interactive app & push to GitHub', type: 'milestone', completed: false }
-        ]
-      }
-    ]
+          { id: 'm2', title: 'Build a vanilla-JS interactive app & push to GitHub', type: 'milestone', completed: false },
+        ],
+      },
+    ],
   },
   {
     id: 'phase-c',
@@ -123,7 +177,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't17', title: 'React components & JSX', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't18', title: 'Trees (Traversals)', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w10',
@@ -131,7 +185,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't19', title: 'Props, State & Hooks', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't20', title: 'Trees (BST)', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w11',
@@ -139,7 +193,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't21', title: 'useEffect in depth', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't22', title: 'Basic problem patterns revision', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w12',
@@ -147,10 +201,10 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't23', title: 'React Routing', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't24', title: 'More problem patterns', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-          { id: 'm3', title: 'Build React frontend project (multi-component, API) + deploy', type: 'milestone', completed: false }
-        ]
-      }
-    ]
+          { id: 'm3', title: 'Build React frontend project (multi-component, API) + deploy', type: 'milestone', completed: false },
+        ],
+      },
+    ],
   },
   {
     id: 'phase-d',
@@ -163,7 +217,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't25', title: 'Node.js & Express basics', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't26', title: 'Trees (Advanced)', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w14',
@@ -171,7 +225,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't27', title: 'REST APIs', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't28', title: 'Graphs (BFS/DFS)', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w15',
@@ -179,7 +233,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't29', title: 'MongoDB & Mongoose', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't30', title: 'Intro Dynamic Programming', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w16',
@@ -187,7 +241,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't31', title: 'Authentication & JWT', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't32', title: '1D DP Problems', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w17',
@@ -195,10 +249,10 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't33', title: 'Git/GitHub Workflow', type: 'course', completed: false, link: 'https://www.udemy.com/course/web-dev-master/' },
           { id: 't34', title: '2D DP Problems', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-          { id: 'm4', title: 'Build ONE complete full-stack MERN app with auth + DB + deploy', type: 'milestone', completed: false }
-        ]
-      }
-    ]
+          { id: 'm4', title: 'Build ONE complete full-stack MERN app with auth + DB + deploy', type: 'milestone', completed: false },
+        ],
+      },
+    ],
   },
   {
     id: 'phase-e',
@@ -211,7 +265,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't35', title: 'TypeScript Handbook basics', type: 'course', completed: false, link: 'https://www.typescriptlang.org/docs/handbook/' },
           { id: 't36', title: 'Dynamic Programming continued', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w19',
@@ -219,7 +273,7 @@ export const initialRoadmap: Phase[] = [
         tasks: [
           { id: 't37', title: 'Convert a small project to TS', type: 'course', completed: false, link: 'https://www.typescriptlang.org/docs/handbook/' },
           { id: 't38', title: 'Revise weak topics (Graphs/Trees)', type: 'dsa', completed: false, link: 'https://takeuforward.org/plus' },
-        ]
+        ],
       },
       {
         id: 'w20',
@@ -228,10 +282,10 @@ export const initialRoadmap: Phase[] = [
           { id: 't39', title: 'Write clean READMEs & polish GitHub', type: 'course', completed: false, link: 'https://github.com/' },
           { id: 't40', title: 'Write a 1-page projects-first resume', type: 'course', completed: false },
           { id: 't41', title: 'Set up LinkedIn profile', type: 'course', completed: false, link: 'https://www.linkedin.com/' },
-          { id: 'm5', title: 'Portfolio + resume + 2 deployed projects ready', type: 'milestone', completed: false }
-        ]
-      }
-    ]
+          { id: 'm5', title: 'Portfolio + resume + 2 deployed projects ready', type: 'milestone', completed: false },
+        ],
+      },
+    ],
   },
   {
     id: 'phase-f',
@@ -242,13 +296,13 @@ export const initialRoadmap: Phase[] = [
         id: 'w21',
         title: 'Daily Habits',
         tasks: [
-          { id: 't42', title: 'Apply to 5–10 roles daily', type: 'course', completed: false },
-          { id: 't43', title: 'Send referral messages', type: 'course', completed: false },
+          { id: 't42', title: 'Apply to 5–10 roles daily', type: 'apply', completed: false },
+          { id: 't43', title: 'Send referral messages', type: 'apply', completed: false },
           { id: 't44', title: 'Daily revision + timed medium problems', type: 'dsa', completed: false, link: 'https://leetcode.com/' },
           { id: 't45', title: 'Basic system design + mock interviews', type: 'course', completed: false },
-          { id: 'm6', title: 'Interviews → Offer', type: 'milestone', completed: false }
-        ]
-      }
-    ]
-  }
+          { id: 'm6', title: 'Interviews → Offer', type: 'milestone', completed: false },
+        ],
+      },
+    ],
+  },
 ];

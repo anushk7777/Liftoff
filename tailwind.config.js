@@ -8,21 +8,38 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Space Grotesk', 'Inter', 'sans-serif'],
       },
       colors: {
-        background: '#0F0F11',
-        card: '#18181B',
-        'card-border': '#27272A',
-        primary: {
-          DEFAULT: '#6366F1', // slate-blue / indigo accent
-          hover: '#4F46E5',
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        elevated: 'var(--elevated)',
+        sidebar: 'var(--sidebar)',
+        border: 'var(--border)',
+        'border-strong': 'var(--border-strong)',
+        hover: 'var(--hover)',
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          soft: 'var(--accent-soft)',
         },
-        text: {
-          DEFAULT: '#F4F4F5', // zinc-100
-          muted: '#A1A1AA',   // zinc-400
-          subtle: '#52525B',  // zinc-600
-        }
+        ink: {
+          DEFAULT: 'var(--text)',
+          muted: 'var(--text-muted)',
+          subtle: 'var(--text-subtle)',
+        },
+        danger: 'var(--danger)',
+        success: 'var(--success)',
+        warning: 'var(--warning)',
+      },
+      borderRadius: {
+        DEFAULT: 'var(--radius)',
+      },
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
       },
     },
   },

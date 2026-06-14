@@ -1,82 +1,115 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Menu, Rocket } from 'lucide-react';
 import { useStore } from './store/useStore';
-import { LayoutDashboard, CheckSquare, BarChart2, Settings } from 'lucide-react';
 import { cn } from './lib/utils';
+import Sidebar from './components/Sidebar';
 import PWAPrompt from './components/PWAPrompt';
+import PanicButton from './components/PanicButton';
 
-import Today from './pages/Today';
+import Dashboard from './pages/Dashboard';
+import Tasks from './pages/Tasks';
+import Focus from './pages/Focus';
+import BrainDump from './pages/BrainDump';
+import Roadmap from './pages/Roadmap';
 import Stats from './pages/Stats';
 import SettingsPage from './pages/Settings';
 
-function NavItem({ to, icon, label }: { to: string, icon: React.ReactNode, label: string }) {
-  return (
-    <NavLink 
-      to={to} 
-      className={({ isActive }) => cn(
-        "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-        isActive 
-          ? "bg-[rgba(255,255,255,0.06)] text-[var(--text)]" 
-          : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(255,255,255,0.03)]"
-      )}
-    >
-      <div className="w-4 h-4">{icon}</div>
-      <span className="hidden sm:inline">{label}</span>
-    </NavLink>
+function Shell() {
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('liftoff_sidebar_collapsed') === '1',
   );
-}
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-function Layout() {
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      localStorage.setItem('liftoff_sidebar_collapsed', !c ? '1' : '0');
+      return !c;
+    });
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg-deep)] text-[var(--text)] font-sans">
-      <header className="border-b border-[var(--border)] bg-[var(--surface)] sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-base font-semibold tracking-tight text-[var(--text)] flex items-center gap-2">
-              <div className="w-5 h-5 bg-[var(--accent)] rounded-sm flex items-center justify-center">
-                <CheckSquare className="w-3 h-3 text-white" />
-              </div>
-              Liftoff
-            </h1>
-            <nav className="flex items-center gap-1">
-              <NavItem to="/" icon={<LayoutDashboard />} label="Today" />
-              <NavItem to="/stats" icon={<BarChart2 />} label="Stats" />
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-             <NavLink to="/settings" className="text-[var(--text-muted)] hover:text-[var(--text)] p-2 rounded-md hover:bg-[rgba(255,255,255,0.03)] transition-colors">
-               <Settings className="w-4 h-4" />
-             </NavLink>
+    <div className="flex h-screen overflow-hidden bg-bg text-ink">
+      {/* Desktop sidebar */}
+      <div className="hidden md:block shrink-0">
+        <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full shadow-lg animate-rise">
+            <Sidebar
+              collapsed={false}
+              onToggle={() => setMobileOpen(false)}
+              onNavigate={() => setMobileOpen(false)}
+            />
           </div>
         </div>
-      </header>
+      )}
 
-      <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8">
-        <Routes>
-          <Route path="/" element={<Today />} />
-          <Route path="/stats" element={<Stats />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/roadmap" element={<div className="p-4 text-[var(--text-muted)] text-center mt-10">Roadmap moved to background.</div>} />
-          <Route path="/resources" element={<div className="p-4 text-[var(--text-muted)] text-center mt-10">Resources moved to background.</div>} />
-        </Routes>
-      </main>
-      
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile top bar */}
+        <header className="md:hidden flex items-center justify-between h-14 px-4 border-b border-border bg-sidebar shrink-0">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2 -ml-2 rounded-md text-ink-muted hover:text-ink hover:bg-hover"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center">
+              <Rocket className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="font-display font-bold text-sm">Liftoff</span>
+          </div>
+          <div className="w-9" />
+        </header>
+
+        <main className={cn('flex-1 overflow-y-auto')}>
+          <div className="mx-auto w-full max-w-5xl px-5 py-7 sm:px-8 sm:py-10">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/tasks" element={<Tasks />} />
+              <Route path="/focus" element={<Focus />} />
+              <Route path="/brain-dump" element={<BrainDump />} />
+              <Route path="/roadmap" element={<Roadmap />} />
+              <Route path="/stats" element={<Stats />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </div>
+        </main>
+      </div>
+
+      <PanicButton />
       <PWAPrompt />
     </div>
   );
 }
 
 function App() {
-  const { loadFromDB } = useStore();
+  const { loadFromDB, theme, reduceMotion } = useStore();
 
   useEffect(() => {
-    document.documentElement.classList.add('dark');
     loadFromDB();
   }, [loadFromDB]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('reduce-motion', reduceMotion);
+  }, [reduceMotion]);
+
   return (
     <BrowserRouter>
-      <Layout />
+      <Shell />
     </BrowserRouter>
   );
 }

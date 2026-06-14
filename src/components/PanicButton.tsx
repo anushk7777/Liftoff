@@ -1,72 +1,61 @@
 import { useState } from 'react';
-import { LifeBuoy, X, Heart } from 'lucide-react';
+import { LifeBuoy, Heart } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { Modal } from './ui';
 
 const MOTIVATION_LINES = [
-  "A short day beats a zero day. Just 10 minutes is enough.",
+  'A short day beats a zero day. Just 10 minutes is enough.',
   "You're building the foundation. It takes time. Don't rush.",
-  "Remember your 'why'. December 2026 isn't that far away.",
-  "The streak is just a number, but the habit is forever.",
-  "Tired? Do the minimum. Keep the muscle memory alive.",
+  "Remember your 'why'. The goal isn't that far away.",
+  'The streak is just a number, but the habit is forever.',
+  'Tired? Do the minimum. Keep the muscle memory alive.',
   "It's okay to struggle. Every senior dev was once here.",
   "Rest if you must, but don't quit.",
-  "You are doing this for future you. Show up for them."
+  'You are doing this for future you. Show up for them.',
 ];
 
 export default function PanicButton() {
   const [open, setOpen] = useState(false);
   const { streak } = useStore();
-  const line = MOTIVATION_LINES[Math.floor(Math.random() * MOTIVATION_LINES.length)];
+  const [line] = useState(
+    () => MOTIVATION_LINES[Math.floor(Math.random() * MOTIVATION_LINES.length)],
+  );
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 md:bottom-8 right-4 md:right-8 z-40 bg-[var(--color-background)] border border-[var(--color-border)] p-2.5 rounded shadow-sm text-[var(--color-muted)] hover:text-[var(--color-foreground)] transition-colors"
+        className="fixed bottom-5 right-5 z-40 w-11 h-11 rounded-full bg-surface border border-border shadow-md text-ink-muted hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
         aria-label="Feeling like quitting?"
+        title="Feeling stuck?"
       >
         <LifeBuoy className="w-5 h-5" />
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-[var(--color-background)] border border-[var(--color-border)] rounded-md shadow-lg w-full max-w-sm p-6 relative animate-in fade-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute top-3 right-3 text-[var(--color-muted)] hover:text-[var(--color-foreground)] transition-colors p-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="text-center space-y-6 mt-4">
-              <div className="flex justify-center">
-                <Heart className="w-8 h-8 text-[var(--color-muted)]" />
-              </div>
-
-              <div className="space-y-3">
-                <h2 className="text-xl font-bold text-[var(--color-foreground)]">Take a deep breath.</h2>
-                <p className="text-sm text-[var(--color-muted)] leading-relaxed">
-                  {line}
-                </p>
-              </div>
-
-              {streak > 0 && (
-                <div className="border border-[var(--color-border)] p-4 rounded bg-[var(--color-background)]">
-                  <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-1">Current Streak</p>
-                  <p className="text-2xl font-bold text-[var(--color-foreground)]">{streak} Days</p>
-                </div>
-              )}
-
-              <button
-                onClick={() => setOpen(false)}
-                className="w-full bg-[var(--color-foreground)] text-[var(--color-background)] font-medium text-sm py-2 rounded transition-colors hover:opacity-90"
-              >
-                I'm staying.
-              </button>
+      <Modal open={open} onClose={() => setOpen(false)} maxWidth="max-w-sm">
+        <div className="text-center space-y-5 py-2">
+          <div className="flex justify-center">
+            <div className="w-12 h-12 rounded-full bg-accent-soft flex items-center justify-center">
+              <Heart className="w-6 h-6 text-accent" />
             </div>
           </div>
+          <div className="space-y-2">
+            <h2 className="font-display text-xl font-bold text-ink">Take a deep breath.</h2>
+            <p className="text-sm text-ink-muted leading-relaxed px-2">{line}</p>
+          </div>
+          {streak > 0 && (
+            <div className="card p-3 bg-elevated">
+              <p className="text-[11px] text-ink-subtle uppercase tracking-wider mb-1">
+                Current streak
+              </p>
+              <p className="font-display text-2xl font-bold text-ink">{streak} days</p>
+            </div>
+          )}
+          <button onClick={() => setOpen(false)} className="btn btn-primary w-full">
+            I'm staying.
+          </button>
         </div>
-      )}
+      </Modal>
     </>
   );
 }
