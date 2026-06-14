@@ -1,13 +1,27 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Phase, DailyTask } from './data';
-import { initialRoadmap } from './data';
+import type {
+  Phase,
+  TodoTask,
+  Idea,
+  Note,
+  FocusSession,
+  PomodoroSettings,
+  Priority,
+  Status,
+} from './data';
+import { initialRoadmap, defaultPomodoro } from './data';
 import { startOfDay, differenceInCalendarDays } from 'date-fns';
 
 export interface ActivityLog {
-  date: string; // ISO string
+  date: string; // ISO start-of-day
   type: 'full' | 'minimum';
 }
+
+const uid = () =>
+  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+
+const nowISO = () => new Date().toISOString();
 
 interface AppState {
   _initialized: boolean;
@@ -21,275 +35,385 @@ interface AppState {
   reduceMotion: boolean;
   setTargetDate: (date: string) => void;
   setTheme: (theme: 'light' | 'dark') => void;
+  toggleTheme: () => void;
   setReduceMotion: (reduce: boolean) => void;
 
   // Roadmap
   phases: Phase[];
-  toggleTask: (phaseId: string, weekId: string, taskId: string) => void;
+  toggleRoadmapTask: (phaseId: string, weekId: string, taskId: string) => void;
+  replaceRoadmap: (phases: Phase[]) => void;
+  appendRoadmap: (phases: Phase[]) => void;
   resetRoadmap: () => void;
+
+  // Full task manager
+  tasks: TodoTask[];
+  addTask: (task: Partial<TodoTask> & { title: string }) => void;
+  updateTask: (id: string, updates: Partial<TodoTask>) => void;
+  deleteTask: (id: string) => void;
+  cycleTaskStatus: (id: string) => void;
+  setTaskStatus: (id: string, status: Status) => void;
+
+  // Brain dump (quick capture)
+  ideas: Idea[];
+  addIdea: (text: string) => void;
+  updateIdea: (id: string, text: string) => void;
+  deleteIdea: (id: string) => void;
+  archiveIdea: (id: string, archived: boolean) => void;
+  convertIdeaToTask: (id: string) => void;
+
+  // Notes
+  notes: Note[];
+  addNote: () => string;
+  updateNote: (id: string, updates: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
+  togglePinNote: (id: string) => void;
+
+  // Focus / Pomodoro
+  pomodoro: PomodoroSettings;
+  setPomodoro: (updates: Partial<PomodoroSettings>) => void;
+  focusSessions: FocusSession[];
+  logFocusSession: (durationMins: number, kind: 'focus' | 'break', taskTitle?: string) => void;
 
   // Gamification & Stats
   streak: number;
   longestStreak: number;
   freezeAvailable: boolean;
   activityHistory: ActivityLog[];
-  
-  // Manual counters
   problemsSolved: number;
   sectionsCompleted: number;
   projectsShipped: number;
-  
-  incrementProblems: () => void;
-  incrementSections: () => void;
-  
-  // Actions
+  incrementProblems: (delta?: number) => void;
+  incrementSections: (delta?: number) => void;
+
   toggleLogDay: (type: 'full' | 'minimum') => void;
   recalculateStreak: () => void;
-  
+
   // Backup
   exportData: () => string;
   importData: (jsonStr: string) => void;
-
-  // Daily Tasks
-  dailyTasks: DailyTask[];
-  addDailyTask: (task: Omit<DailyTask, 'id' | 'createdAt'>) => void;
-  editDailyTask: (id: string, updates: Partial<DailyTask>) => void;
-  deleteDailyTask: (id: string) => void;
-  toggleDailyTask: (id: string) => void;
 }
 
-// Generate or retrieve a device ID (simple pseudonymous auth)
 const getDeviceId = () => {
   let id = localStorage.getItem('liftoff_device_id');
   if (!id) {
-    id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+    id = uid();
     localStorage.setItem('liftoff_device_id', id);
   }
   return id;
 };
 
-export const useStore = create<AppState>()(
-  (set, get) => ({
-    _initialized: false,
-    deviceId: getDeviceId(),
-    setInitialized: (val) => set({ _initialized: val }),
+const NON_PERSISTED = new Set(['_initialized', 'deviceId']);
 
-    loadFromDB: async () => {
-      const state = get();
-      try {
-        const { data } = await supabase
-          .from('user_data')
-          .select('data')
-          .eq('id', state.deviceId)
-          .single();
-          
-        if (data && data.data) {
-          // Merge loaded data
-          set({ ...data.data, _initialized: true, deviceId: state.deviceId });
-        } else {
-          set({ _initialized: true });
-        }
-      } catch (err) {
-        console.error("Failed to load from Supabase:", err);
+export const useStore = create<AppState>()((set, get) => ({
+  _initialized: false,
+  deviceId: getDeviceId(),
+  setInitialized: (val) => set({ _initialized: val }),
+
+  loadFromDB: async () => {
+    const state = get();
+    try {
+      const { data } = await supabase
+        .from('user_data')
+        .select('data')
+        .eq('id', state.deviceId)
+        .single();
+
+      if (data && data.data) {
+        const loaded = migrate(data.data);
+        set({ ...loaded, _initialized: true, deviceId: state.deviceId });
+      } else {
         set({ _initialized: true });
       }
-      get().recalculateStreak();
-    },
+    } catch (err) {
+      console.error('Failed to load from Supabase:', err);
+      set({ _initialized: true });
+    }
+    get().recalculateStreak();
+  },
 
-    // Settings
-    targetDate: '2026-10-01',
-    theme: 'dark',
-    reduceMotion: false,
-    setTargetDate: (date) => set({ targetDate: date }),
-    setTheme: (theme) => set({ theme }),
-    setReduceMotion: (reduceMotion) => set({ reduceMotion }),
+  // ---- Settings ----
+  targetDate: '2026-12-01',
+  theme: 'dark',
+  reduceMotion: false,
+  setTargetDate: (date) => set({ targetDate: date }),
+  setTheme: (theme) => set({ theme }),
+  toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+  setReduceMotion: (reduceMotion) => set({ reduceMotion }),
 
-    // Roadmap
-    phases: initialRoadmap,
-    toggleTask: (phaseId, weekId, taskId) => set((state) => {
+  // ---- Roadmap ----
+  phases: initialRoadmap,
+  toggleRoadmapTask: (phaseId, weekId, taskId) =>
+    set((state) => {
       const newPhases = JSON.parse(JSON.stringify(state.phases)) as Phase[];
-      let newlyCompletedMilestone = false;
-      let newlyUncompletedMilestone = false;
-
-      newPhases.forEach(p => {
-        if (p.id === phaseId) {
-          p.weeks.forEach(w => {
-            if (w.id === weekId) {
-              w.tasks.forEach(t => {
-                if (t.id === taskId) {
-                  t.completed = !t.completed;
-                  if (t.type === 'milestone') {
-                    if (t.completed) newlyCompletedMilestone = true;
-                    else newlyUncompletedMilestone = true;
-                  }
-                }
-              });
+      let completedMilestone = false;
+      let uncompletedMilestone = false;
+      for (const p of newPhases) {
+        if (p.id !== phaseId) continue;
+        for (const w of p.weeks) {
+          if (w.id !== weekId) continue;
+          for (const t of w.tasks) {
+            if (t.id !== taskId) continue;
+            t.completed = !t.completed;
+            if (t.type === 'milestone') {
+              if (t.completed) completedMilestone = true;
+              else uncompletedMilestone = true;
             }
-          });
-        }
-      });
-
-      const updates: Partial<AppState> = { phases: newPhases };
-      if (newlyCompletedMilestone) {
-        updates.projectsShipped = state.projectsShipped + 1;
-      } else if (newlyUncompletedMilestone) {
-        updates.projectsShipped = Math.max(0, state.projectsShipped - 1);
-      }
-
-      return updates;
-    }),
-    resetRoadmap: () => set({ phases: initialRoadmap }),
-
-    // Gamification
-    streak: 0,
-    longestStreak: 0,
-    freezeAvailable: true,
-    activityHistory: [],
-    
-    problemsSolved: 0,
-    sectionsCompleted: 0,
-    projectsShipped: 0,
-    
-    incrementProblems: () => set(s => ({ problemsSolved: s.problemsSolved + 1 })),
-    incrementSections: () => set(s => ({ sectionsCompleted: s.sectionsCompleted + 1 })),
-
-    // Flexible logging: if same type exists, unlog it. If different type, switch it. If none, log it.
-    toggleLogDay: (type: 'full' | 'minimum') => {
-      const state = get();
-      const today = startOfDay(new Date()).toISOString();
-      const existingLogIndex = state.activityHistory.findIndex(l => l.date === today);
-      
-      let newHistory = [...state.activityHistory];
-      
-      if (existingLogIndex >= 0) {
-        const existing = newHistory[existingLogIndex];
-        if (existing.type === type) {
-          // Unlog
-          newHistory.splice(existingLogIndex, 1);
-        } else {
-          // Switch type
-          newHistory[existingLogIndex].type = type;
-        }
-      } else {
-        // Log new
-        newHistory.push({ date: today, type });
-      }
-
-      set({ activityHistory: newHistory });
-      get().recalculateStreak();
-    },
-
-    recalculateStreak: () => {
-      const state = get();
-      if (state.activityHistory.length === 0) {
-        set({ streak: 0, freezeAvailable: true });
-        return;
-      }
-
-      // Sort history chronologically
-      const sortedHistory = [...state.activityHistory].sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-      let currentStreak = 0;
-      let maxStreak = state.longestStreak;
-      let freeze = true;
-
-      const firstDate = new Date(sortedHistory[0].date);
-      const today = startOfDay(new Date());
-      const totalDays = differenceInCalendarDays(today, firstDate);
-
-      let historyIndex = 0;
-
-      for (let i = 0; i <= totalDays; i++) {
-        const currentDate = new Date(firstDate);
-        currentDate.setDate(currentDate.getDate() + i);
-        const dateStr = currentDate.toISOString();
-
-        // Is there a log for this day?
-        if (historyIndex < sortedHistory.length && sortedHistory[historyIndex].date === dateStr) {
-          currentStreak++;
-          historyIndex++;
-        } else {
-          // Missed day
-          if (freeze) {
-            currentStreak++; // saved by freeze
-            freeze = false;
-          } else {
-            // Streak broken
-            currentStreak = 0;
-            freeze = true; // reset freeze for next streak
           }
         }
-
-        if (currentStreak > maxStreak) {
-          maxStreak = currentStreak;
-        }
       }
+      const updates: Partial<AppState> = { phases: newPhases };
+      if (completedMilestone) updates.projectsShipped = state.projectsShipped + 1;
+      else if (uncompletedMilestone)
+        updates.projectsShipped = Math.max(0, state.projectsShipped - 1);
+      return updates;
+    }),
+  replaceRoadmap: (phases) => set({ phases }),
+  appendRoadmap: (phases) => set((s) => ({ phases: [...s.phases, ...phases] })),
+  resetRoadmap: () => set({ phases: initialRoadmap }),
 
-      set({ 
-        streak: currentStreak, 
-        longestStreak: maxStreak,
-        freezeAvailable: freeze
-      });
-    },
+  // ---- Tasks ----
+  tasks: [],
+  addTask: (task) =>
+    set((state) => ({
+      tasks: [
+        {
+          id: uid(),
+          title: task.title,
+          notes: task.notes,
+          priority: (task.priority as Priority) || 'medium',
+          status: (task.status as Status) || 'todo',
+          category: task.category,
+          estimate: task.estimate,
+          dueDate: task.dueDate,
+          createdAt: nowISO(),
+          completedAt: task.status === 'done' ? nowISO() : undefined,
+        },
+        ...state.tasks,
+      ],
+    })),
+  updateTask: (id, updates) =>
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    })),
+  deleteTask: (id) => set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
+  setTaskStatus: (id, status) =>
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === id
+          ? { ...t, status, completedAt: status === 'done' ? nowISO() : undefined }
+          : t,
+      ),
+    })),
+  cycleTaskStatus: (id) => {
+    const order: Status[] = ['todo', 'doing', 'done'];
+    const t = get().tasks.find((x) => x.id === id);
+    if (!t) return;
+    const next = order[(order.indexOf(t.status) + 1) % order.length];
+    get().setTaskStatus(id, next);
+  },
 
-    exportData: () => {
-      const state = get();
-      const { _initialized, deviceId, ...dataToExport } = state;
-      return JSON.stringify(dataToExport);
-    },
-    
-    importData: (jsonStr) => {
-      try {
-        const parsed = JSON.parse(jsonStr);
-        set(parsed);
-        get().recalculateStreak();
-      } catch (e) {
-        console.error("Failed to parse import string", e);
+  // ---- Brain dump ----
+  ideas: [],
+  addIdea: (text) =>
+    set((state) => ({
+      ideas: [{ id: uid(), text, createdAt: nowISO(), archived: false }, ...state.ideas],
+    })),
+  updateIdea: (id, text) =>
+    set((state) => ({
+      ideas: state.ideas.map((i) => (i.id === id ? { ...i, text } : i)),
+    })),
+  deleteIdea: (id) => set((state) => ({ ideas: state.ideas.filter((i) => i.id !== id) })),
+  archiveIdea: (id, archived) =>
+    set((state) => ({
+      ideas: state.ideas.map((i) => (i.id === id ? { ...i, archived } : i)),
+    })),
+  convertIdeaToTask: (id) => {
+    const idea = get().ideas.find((i) => i.id === id);
+    if (!idea) return;
+    get().addTask({ title: idea.text, priority: 'medium', status: 'todo' });
+    get().archiveIdea(id, true);
+  },
+
+  // ---- Notes ----
+  notes: [],
+  addNote: () => {
+    const id = uid();
+    set((state) => ({
+      notes: [
+        { id, title: '', content: '', createdAt: nowISO(), updatedAt: nowISO(), pinned: false },
+        ...state.notes,
+      ],
+    }));
+    return id;
+  },
+  updateNote: (id, updates) =>
+    set((state) => ({
+      notes: state.notes.map((n) =>
+        n.id === id ? { ...n, ...updates, updatedAt: nowISO() } : n,
+      ),
+    })),
+  deleteNote: (id) => set((state) => ({ notes: state.notes.filter((n) => n.id !== id) })),
+  togglePinNote: (id) =>
+    set((state) => ({
+      notes: state.notes.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n)),
+    })),
+
+  // ---- Focus / Pomodoro ----
+  pomodoro: defaultPomodoro,
+  setPomodoro: (updates) => set((s) => ({ pomodoro: { ...s.pomodoro, ...updates } })),
+  focusSessions: [],
+  logFocusSession: (durationMins, kind, taskTitle) =>
+    set((state) => ({
+      focusSessions: [
+        { id: uid(), date: nowISO(), durationMins, kind, taskTitle },
+        ...state.focusSessions,
+      ].slice(0, 1000),
+    })),
+
+  // ---- Gamification ----
+  streak: 0,
+  longestStreak: 0,
+  freezeAvailable: true,
+  activityHistory: [],
+  problemsSolved: 0,
+  sectionsCompleted: 0,
+  projectsShipped: 0,
+  incrementProblems: (delta = 1) =>
+    set((s) => ({ problemsSolved: Math.max(0, s.problemsSolved + delta) })),
+  incrementSections: (delta = 1) =>
+    set((s) => ({ sectionsCompleted: Math.max(0, s.sectionsCompleted + delta) })),
+
+  toggleLogDay: (type) => {
+    const state = get();
+    const today = startOfDay(new Date()).toISOString();
+    const idx = state.activityHistory.findIndex((l) => l.date === today);
+    const newHistory = [...state.activityHistory];
+    if (idx >= 0) {
+      if (newHistory[idx].type === type) newHistory.splice(idx, 1);
+      else newHistory[idx].type = type;
+    } else {
+      newHistory.push({ date: today, type });
+    }
+    set({ activityHistory: newHistory });
+    get().recalculateStreak();
+  },
+
+  recalculateStreak: () => {
+    const state = get();
+    if (state.activityHistory.length === 0) {
+      set({ streak: 0, freezeAvailable: true });
+      return;
+    }
+    const sorted = [...state.activityHistory].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+    let currentStreak = 0;
+    let maxStreak = state.longestStreak;
+    let freeze = true;
+    const firstDate = new Date(sorted[0].date);
+    const today = startOfDay(new Date());
+    const totalDays = differenceInCalendarDays(today, firstDate);
+    let hi = 0;
+    for (let i = 0; i <= totalDays; i++) {
+      const d = new Date(firstDate);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString();
+      if (hi < sorted.length && sorted[hi].date === dateStr) {
+        currentStreak++;
+        hi++;
+      } else if (freeze) {
+        currentStreak++;
+        freeze = false;
+      } else {
+        currentStreak = 0;
+        freeze = true;
       }
-    },
+      if (currentStreak > maxStreak) maxStreak = currentStreak;
+    }
+    set({ streak: currentStreak, longestStreak: maxStreak, freezeAvailable: freeze });
+  },
 
-    // Daily Tasks
-    dailyTasks: [],
-    addDailyTask: (task) => set((state) => ({
-      dailyTasks: [...state.dailyTasks, {
-        ...task,
-        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
-        createdAt: new Date().toISOString()
-      }]
-    })),
-    editDailyTask: (id, updates) => set((state) => ({
-      dailyTasks: state.dailyTasks.map(t => t.id === id ? { ...t, ...updates } : t)
-    })),
-    deleteDailyTask: (id) => set((state) => ({
-      dailyTasks: state.dailyTasks.filter(t => t.id !== id)
-    })),
-    toggleDailyTask: (id) => set((state) => ({
-      dailyTasks: state.dailyTasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
-    }))
-  })
-);
+  exportData: () => {
+    const state = get();
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(state)) {
+      if (typeof v === 'function' || NON_PERSISTED.has(k)) continue;
+      out[k] = v;
+    }
+    return JSON.stringify(out, null, 2);
+  },
 
-// Sync to Supabase debounced
-let syncTimeout: any;
+  importData: (jsonStr) => {
+    try {
+      const parsed = migrate(JSON.parse(jsonStr));
+      set(parsed);
+      get().recalculateStreak();
+    } catch (e) {
+      console.error('Failed to parse import string', e);
+    }
+  },
+}));
+
+interface LegacyDailyTask {
+  id?: string;
+  title?: string;
+  completed?: boolean;
+  category?: string;
+  duration?: string;
+  date?: string;
+  createdAt?: string;
+}
+
+// Migrate older saved shapes (e.g. dailyTasks) into the new model.
+function migrate(data: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...data };
+
+  // dailyTasks -> tasks
+  if (Array.isArray(out.dailyTasks) && !Array.isArray(out.tasks)) {
+    out.tasks = (out.dailyTasks as LegacyDailyTask[]).map((d) => ({
+      id: d.id || uid(),
+      title: d.title || 'Untitled',
+      priority: 'medium' as Priority,
+      status: (d.completed ? 'done' : 'todo') as Status,
+      category: d.category,
+      estimate: d.duration,
+      dueDate: d.date,
+      createdAt: d.createdAt || nowISO(),
+      completedAt: d.completed ? d.createdAt || nowISO() : undefined,
+    }));
+  }
+  delete out.dailyTasks;
+
+  // Ensure new collections exist
+  if (!Array.isArray(out.tasks)) out.tasks = [];
+  if (!Array.isArray(out.ideas)) out.ideas = [];
+  if (!Array.isArray(out.notes)) out.notes = [];
+  if (!Array.isArray(out.focusSessions)) out.focusSessions = [];
+  if (!out.pomodoro) out.pomodoro = defaultPomodoro;
+
+  return out;
+}
+
+// Debounced cloud sync
+let syncTimeout: ReturnType<typeof setTimeout>;
 useStore.subscribe((state) => {
-  // Only sync if initialized to prevent overwriting cloud with default state on load
   if (!state._initialized) return;
-  
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(async () => {
     try {
-      const { _initialized, deviceId, loadFromDB, setInitialized, ...dataToSync } = state;
+      const dataToSync: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(state)) {
+        if (typeof v === 'function' || NON_PERSISTED.has(k)) continue;
+        dataToSync[k] = v;
+      }
       await supabase
         .from('user_data')
-        .upsert({ 
-          id: state.deviceId, 
-          data: dataToSync,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'id' });
+        .upsert(
+          { id: state.deviceId, data: dataToSync, updated_at: nowISO() },
+          { onConflict: 'id' },
+        );
     } catch (e) {
-      console.error("Background sync failed", e);
+      console.error('Background sync failed', e);
     }
   }, 1000);
 });

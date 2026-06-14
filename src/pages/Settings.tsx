@@ -1,35 +1,50 @@
 import { useState } from 'react';
-import { useStore } from '../store/useStore';
-import { Moon, Sun, Download, Upload, MonitorOff } from 'lucide-react';
+import {
+  Settings as SettingsIcon,
+  Moon,
+  Sun,
+  Download,
+  Upload,
+  Timer,
+  Target,
+  Sparkles,
+} from 'lucide-react';
 import { format } from 'date-fns';
+import { useStore } from '../store/useStore';
+import { cn } from '../lib/utils';
+import { PageHeader } from '../components/ui';
 
 export default function Settings() {
-  const { 
-    theme, setTheme, 
-    targetDate, setTargetDate,
-    reduceMotion, setReduceMotion,
-    exportData, importData,
-    resetRoadmap
+  const {
+    theme,
+    setTheme,
+    targetDate,
+    setTargetDate,
+    reduceMotion,
+    setReduceMotion,
+    pomodoro,
+    setPomodoro,
+    exportData,
+    importData,
+    resetRoadmap,
   } = useStore();
-  
+
   const [importStatus, setImportStatus] = useState('');
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      importData(content);
-      setImportStatus('Data imported successfully!');
+    reader.onload = (ev) => {
+      importData(ev.target?.result as string);
+      setImportStatus('Backup imported successfully.');
       setTimeout(() => setImportStatus(''), 3000);
     };
     reader.readAsText(file);
   };
 
   const handleExport = () => {
-    const data = exportData();
-    const blob = new Blob([data], { type: 'application/json' });
+    const blob = new Blob([exportData()], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -39,94 +54,211 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-2xl animate-in fade-in duration-300">
-      <header className="mb-8 border-b border-[var(--color-border)] pb-4">
-        <h1 className="text-3xl font-bold tracking-tight text-[var(--color-foreground)] mb-1">Settings</h1>
-        <p className="text-[var(--color-muted)] text-sm">Configure your workspace.</p>
-      </header>
+    <div className="animate-rise max-w-3xl">
+      <PageHeader
+        title="Settings"
+        subtitle="Tune your workspace."
+        icon={<SettingsIcon className="w-5 h-5" />}
+      />
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Appearance */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] border-b border-[var(--color-border)] pb-2">Appearance</h2>
-          
-          <div className="flex items-center justify-between py-2">
-            <span className="text-sm font-medium text-[var(--color-foreground)]">Theme</span>
-            <div className="flex bg-[var(--color-hover)] p-0.5 rounded border border-[var(--color-border)]">
-              <button 
-                onClick={() => setTheme('light')}
-                className={`p-1.5 rounded transition-colors flex items-center justify-center ${theme === 'light' ? 'bg-[var(--color-background)] shadow-sm text-[var(--color-foreground)] border border-[var(--color-border)]' : 'text-[var(--color-muted)] hover:text-[var(--color-foreground)]'}`}
-              >
+        <Section title="Appearance">
+          <Row label="Theme" desc="Dark-first, switch any time.">
+            <div className="flex bg-elevated p-0.5 rounded-lg border border-border">
+              <ThemeBtn active={theme === 'light'} onClick={() => setTheme('light')}>
                 <Sun className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => setTheme('dark')}
-                className={`p-1.5 rounded transition-colors flex items-center justify-center ${theme === 'dark' ? 'bg-[var(--color-background)] shadow-sm text-[var(--color-foreground)] border border-[var(--color-border)]' : 'text-[var(--color-muted)] hover:text-[var(--color-foreground)]'}`}
-              >
+              </ThemeBtn>
+              <ThemeBtn active={theme === 'dark'} onClick={() => setTheme('dark')}>
                 <Moon className="w-4 h-4" />
-              </button>
+              </ThemeBtn>
             </div>
-          </div>
+          </Row>
+          <Row label="Reduce motion" desc="Minimise animations.">
+            <Toggle checked={reduceMotion} onChange={setReduceMotion} />
+          </Row>
+        </Section>
 
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
-              <MonitorOff className="w-4 h-4 text-[var(--color-muted)]" />
-              <span className="text-sm font-medium text-[var(--color-foreground)]">Reduce Motion</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" checked={reduceMotion} onChange={(e) => setReduceMotion(e.target.checked)} />
-              <div className="w-9 h-5 bg-[var(--color-border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--color-primary)]"></div>
-            </label>
-          </div>
-        </section>
-
-        {/* Preferences */}
-        <section className="space-y-3 pt-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] border-b border-[var(--color-border)] pb-2">Target Goal</h2>
-          
-          <div className="flex items-center justify-between py-2">
-            <span className="text-sm font-medium text-[var(--color-foreground)]">Target Date</span>
-            <input 
-              type="date" 
+        {/* Goal */}
+        <Section title="Goal" icon={<Target className="w-4 h-4" />}>
+          <Row label="Target date" desc="The day you land the role.">
+            <input
+              type="date"
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
-              className="bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)] text-[var(--color-foreground)]"
+              className="input w-auto"
+            />
+          </Row>
+        </Section>
+
+        {/* Pomodoro */}
+        <Section title="Focus timer" icon={<Timer className="w-4 h-4" />}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <NumField
+              label="Focus (min)"
+              value={pomodoro.focusMins}
+              onChange={(v) => setPomodoro({ focusMins: v })}
+            />
+            <NumField
+              label="Short break"
+              value={pomodoro.shortBreakMins}
+              onChange={(v) => setPomodoro({ shortBreakMins: v })}
+            />
+            <NumField
+              label="Long break"
+              value={pomodoro.longBreakMins}
+              onChange={(v) => setPomodoro({ longBreakMins: v })}
+            />
+            <NumField
+              label="Rounds / long"
+              value={pomodoro.roundsBeforeLong}
+              onChange={(v) => setPomodoro({ roundsBeforeLong: v })}
             />
           </div>
-        </section>
+        </Section>
 
         {/* Data */}
-        <section className="space-y-3 pt-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] border-b border-[var(--color-border)] pb-2">Data Management</h2>
-          
-          <div className="flex flex-col sm:flex-row gap-3 py-2">
-            <button 
-              onClick={handleExport}
-              className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-background)] hover:bg-[var(--color-hover)] border border-[var(--color-border)] py-2 rounded transition-colors text-sm font-medium text-[var(--color-foreground)]"
-            >
-              <Download className="w-4 h-4" /> Export Backup
+        <Section title="Data">
+          <p className="text-xs text-ink-subtle mb-3">
+            Your data syncs to the cloud automatically. You can also keep a local backup.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={handleExport} className="btn btn-secondary flex-1">
+              <Download className="w-4 h-4" /> Export backup
             </button>
-            <label className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-background)] hover:bg-[var(--color-hover)] border border-[var(--color-border)] py-2 rounded transition-colors text-sm font-medium cursor-pointer text-[var(--color-foreground)]">
-              <Upload className="w-4 h-4" /> Import Backup
+            <label className="btn btn-secondary flex-1 cursor-pointer">
+              <Upload className="w-4 h-4" /> Import backup
               <input type="file" accept=".json" className="hidden" onChange={handleImport} />
             </label>
           </div>
-          {importStatus && <p className="text-xs text-green-600 font-medium">{importStatus}</p>}
+          {importStatus && <p className="text-xs text-success font-medium mt-2">{importStatus}</p>}
+          <button
+            onClick={() => {
+              if (window.confirm('Reset the roadmap to default? Progress will be lost.'))
+                resetRoadmap();
+            }}
+            className="btn btn-danger w-full mt-3"
+          >
+            Reset roadmap progress
+          </button>
+        </Section>
 
-          <div className="pt-2">
-            <button 
-              onClick={() => {
-                if (window.confirm("Are you sure? This resets all roadmap checkboxes.")) {
-                  resetRoadmap();
-                }
-              }}
-              className="w-full py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded transition-colors text-sm font-medium"
-            >
-              Reset Roadmap Progress
-            </button>
+        {/* Roadmap note */}
+        <Section title="Coming later" icon={<Sparkles className="w-4 h-4" />}>
+          <div className="rounded-lg border border-dashed border-border p-4 text-sm text-ink-muted">
+            <p className="font-medium text-ink mb-1">Goal drift detection</p>
+            Liftoff will watch how your daily work lines up with your roadmap and gently flag when
+            you're drifting off-plan. Planned for a later release.
           </div>
-        </section>
+        </Section>
       </div>
     </div>
+  );
+}
+
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <h2 className="section-label flex items-center gap-1.5 border-b border-border pb-2 mb-3">
+        {icon}
+        {title}
+      </h2>
+      <div className="space-y-1">{children}</div>
+    </section>
+  );
+}
+
+function Row({
+  label,
+  desc,
+  children,
+}: {
+  label: string;
+  desc?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <div>
+        <p className="text-sm font-medium text-ink">{label}</p>
+        {desc && <p className="text-xs text-ink-subtle mt-0.5">{desc}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ThemeBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'p-1.5 rounded-md transition-colors',
+        active ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'relative w-10 h-6 rounded-full transition-colors',
+        checked ? 'bg-accent' : 'bg-border-strong',
+      )}
+    >
+      <span
+        className={cn(
+          'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform',
+          checked && 'translate-x-4',
+        )}
+      />
+    </button>
+  );
+}
+
+function NumField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1.5 block">
+        {label}
+      </span>
+      <input
+        type="number"
+        min={1}
+        max={120}
+        value={value}
+        onChange={(e) => onChange(Math.max(1, Number(e.target.value) || 1))}
+        className="input"
+      />
+    </label>
   );
 }
