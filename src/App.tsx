@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Menu, Rocket } from 'lucide-react';
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import {
+  Menu,
+  Rocket,
+  Search,
+  LayoutDashboard,
+  Sparkles,
+  CheckSquare,
+  Timer,
+  Map,
+} from 'lucide-react';
 import { useStore } from './store/useStore';
 import { cn } from './lib/utils';
 import Sidebar from './components/Sidebar';
 import PWAPrompt from './components/PWAPrompt';
 import PanicButton from './components/PanicButton';
+import CommandPalette from './components/CommandPalette';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import Dashboard from './pages/Dashboard';
 import Coach from './pages/Coach';
@@ -16,11 +27,21 @@ import Roadmap from './pages/Roadmap';
 import Stats from './pages/Stats';
 import SettingsPage from './pages/Settings';
 
+// Compact set for the mobile bottom bar — the moves you reach for most.
+const MOBILE_NAV = [
+  { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
+  { to: '/coach', label: 'Coach', icon: Sparkles },
+  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/focus', label: 'Focus', icon: Timer },
+  { to: '/roadmap', label: 'Roadmap', icon: Map },
+];
+
 function Shell() {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('liftoff_sidebar_collapsed') === '1',
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -29,11 +50,23 @@ function Shell() {
     });
   };
 
+  // ⌘K / Ctrl+K opens the command palette anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg text-ink">
       {/* Desktop sidebar */}
       <div className="hidden md:block shrink-0">
-        <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} />
+        <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} onOpenSearch={() => setPaletteOpen(true)} />
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -48,6 +81,10 @@ function Shell() {
               collapsed={false}
               onToggle={() => setMobileOpen(false)}
               onNavigate={() => setMobileOpen(false)}
+              onOpenSearch={() => {
+                setMobileOpen(false);
+                setPaletteOpen(true);
+              }}
             />
           </div>
         </div>
@@ -69,27 +106,56 @@ function Shell() {
             </div>
             <span className="font-display font-bold text-sm">Liftoff</span>
           </div>
-          <div className="w-9" />
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="p-2 -mr-2 rounded-md text-ink-muted hover:text-ink hover:bg-hover"
+            aria-label="Search"
+          >
+            <Search className="w-5 h-5" />
+          </button>
         </header>
 
-        <main className={cn('flex-1 overflow-y-auto')}>
-          <div className="mx-auto w-full max-w-5xl px-5 py-7 sm:px-8 sm:py-10">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/coach" element={<Coach />} />
-              <Route path="/tasks" element={<Tasks />} />
-              <Route path="/focus" element={<Focus />} />
-              <Route path="/brain-dump" element={<BrainDump />} />
-              <Route path="/roadmap" element={<Roadmap />} />
-              <Route path="/stats" element={<Stats />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-5xl px-5 py-7 pb-24 sm:px-8 sm:py-10 md:pb-10">
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/coach" element={<Coach />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/focus" element={<Focus />} />
+                <Route path="/brain-dump" element={<BrainDump />} />
+                <Route path="/roadmap" element={<Roadmap />} />
+                <Route path="/stats" element={<Stats />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Routes>
+            </ErrorBoundary>
           </div>
         </main>
+
+        {/* Mobile bottom navigation */}
+        <nav className="md:hidden flex items-center justify-around border-t border-border bg-sidebar shrink-0 pb-[env(safe-area-inset-bottom)]">
+          {MOBILE_NAV.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                cn(
+                  'flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium transition-colors',
+                  isActive ? 'text-accent' : 'text-ink-subtle',
+                )
+              }
+            >
+              <Icon className="w-5 h-5" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
       </div>
 
       <PanicButton />
       <PWAPrompt />
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
   );
 }

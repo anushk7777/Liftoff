@@ -24,10 +24,16 @@ function detectType(raw: string): { type: TaskType; text: string } {
       return { type: TYPE_WORDS[word], text: raw.slice(tag[0].length).trim() };
     }
   }
-  // Heuristics on keywords
+  // Heuristics on keywords when no explicit tag was given.
   const lower = raw.toLowerCase();
-  if (/\b(milestone|deploy|ship|build & deploy)\b/.test(lower)) {
-    // keep as-is unless clearly a project
+  if (/\b(milestone|deploy|ship|portfolio|offer)\b/.test(lower)) {
+    return { type: 'milestone', text: raw.trim() };
+  }
+  if (/\b(build|project|app)\b/.test(lower)) {
+    return { type: 'project', text: raw.trim() };
+  }
+  if (/\b(leetcode|dsa|array|tree|graph|dp|sorting|recursion|problem)\b/.test(lower)) {
+    return { type: 'dsa', text: raw.trim() };
   }
   return { type: 'course', text: raw.trim() };
 }

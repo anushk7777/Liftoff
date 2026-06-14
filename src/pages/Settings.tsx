@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 
@@ -120,7 +121,9 @@ export default function Settings() {
         {/* Data */}
         <Section title="Data">
           <p className="text-xs text-ink-subtle mb-3">
-            Your data syncs to the cloud automatically. You can also keep a local backup.
+            {isSupabaseConfigured
+              ? 'Saved on this device and synced to the cloud automatically. You can also keep a local backup.'
+              : 'Saved automatically on this device. Cloud sync is off (no credentials). Keep a local backup to move between devices.'}
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <button onClick={handleExport} className="btn btn-secondary flex-1">

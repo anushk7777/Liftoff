@@ -13,6 +13,7 @@ import {
   Moon,
   Sun,
   Sparkles,
+  Search,
 } from 'lucide-react';
 import { differenceInCalendarDays } from 'date-fns';
 import { useStore } from '../store/useStore';
@@ -32,10 +33,12 @@ export default function Sidebar({
   collapsed,
   onToggle,
   onNavigate,
+  onOpenSearch,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
+  onOpenSearch?: () => void;
 }) {
   const { targetDate, theme, toggleTheme } = useStore();
   const daysLeft = Math.max(0, differenceInCalendarDays(new Date(targetDate), new Date()));
@@ -56,7 +59,7 @@ export default function Sidebar({
           {!collapsed && (
             <div className="leading-tight">
               <p className="font-display font-bold text-[15px] tracking-tight text-ink">Liftoff</p>
-              <p className="text-[10px] text-ink-subtle font-medium">{daysLeft} days to goal</p>
+              <p className="text-[10px] text-ink-subtle font-medium">Mission control</p>
             </div>
           )}
         </div>
@@ -66,6 +69,26 @@ export default function Sidebar({
           aria-label="Toggle sidebar"
         >
           {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* Search / command palette */}
+      <div className="px-2 mb-2">
+        <button
+          onClick={onOpenSearch}
+          title="Search (Ctrl/⌘ K)"
+          className={cn(
+            'w-full flex items-center gap-2 rounded-lg border border-border bg-bg text-ink-subtle hover:text-ink hover:border-border-strong transition-colors',
+            collapsed ? 'justify-center p-2' : 'px-2.5 py-2',
+          )}
+        >
+          <Search className="w-4 h-4 shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="text-sm flex-1 text-left">Search…</span>
+              <kbd className="text-[10px] border border-border rounded px-1 py-0.5">⌘K</kbd>
+            </>
+          )}
         </button>
       </div>
 
