@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Phase } from './data';
+import type { Phase, DailyTask } from './data';
 import { initialRoadmap } from './data';
 import { startOfDay, differenceInCalendarDays } from 'date-fns';
 
@@ -49,6 +49,13 @@ interface AppState {
   // Backup
   exportData: () => string;
   importData: (jsonStr: string) => void;
+
+  // Daily Tasks
+  dailyTasks: DailyTask[];
+  addDailyTask: (task: Omit<DailyTask, 'id' | 'createdAt'>) => void;
+  editDailyTask: (id: string, updates: Partial<DailyTask>) => void;
+  deleteDailyTask: (id: string) => void;
+  toggleDailyTask: (id: string) => void;
 }
 
 // Generate or retrieve a device ID (simple pseudonymous auth)
@@ -241,7 +248,26 @@ export const useStore = create<AppState>()(
       } catch (e) {
         console.error("Failed to parse import string", e);
       }
-    }
+    },
+
+    // Daily Tasks
+    dailyTasks: [],
+    addDailyTask: (task) => set((state) => ({
+      dailyTasks: [...state.dailyTasks, {
+        ...task,
+        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
+        createdAt: new Date().toISOString()
+      }]
+    })),
+    editDailyTask: (id, updates) => set((state) => ({
+      dailyTasks: state.dailyTasks.map(t => t.id === id ? { ...t, ...updates } : t)
+    })),
+    deleteDailyTask: (id) => set((state) => ({
+      dailyTasks: state.dailyTasks.filter(t => t.id !== id)
+    })),
+    toggleDailyTask: (id) => set((state) => ({
+      dailyTasks: state.dailyTasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
+    }))
   })
 );
 

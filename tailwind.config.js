@@ -9,45 +9,21 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
-        display: ['Space Grotesk', 'sans-serif'],
       },
       colors: {
-        background: 'var(--color-background)',
-        foreground: 'var(--color-foreground)',
-        card: 'var(--color-card)',
-        'card-border': 'var(--color-card-border)',
+        background: '#0F0F11',
+        card: '#18181B',
+        'card-border': '#27272A',
         primary: {
-          DEFAULT: '#8B5CF6',
-          50: '#F5F3FF',
-          100: '#EDE9FE',
-          200: '#DDD6FE',
-          300: '#C4B5FD',
-          400: '#A78BFA',
-          500: '#8B5CF6',
-          600: '#7C3AED',
-          700: '#6D28D9',
-          800: '#5B21B6',
-          900: '#4C1D95',
-          950: '#2E1065',
+          DEFAULT: '#6366F1', // slate-blue / indigo accent
+          hover: '#4F46E5',
         },
-        streak: {
-          DEFAULT: '#FB923C',
-          glow: '#F97316',
-        },
-        success: {
-          DEFAULT: '#10B981',
-          glow: '#059669',
+        text: {
+          DEFAULT: '#F4F4F5', // zinc-100
+          muted: '#A1A1AA',   // zinc-400
+          subtle: '#52525B',  // zinc-600
         }
       },
-      animation: {
-        'aurora': 'aurora 60s linear infinite',
-      },
-      keyframes: {
-        aurora: {
-          from: { backgroundPosition: '50% 50%, 50% 50%' },
-          to: { backgroundPosition: '350% 50%, 350% 50%' }
-        }
-      }
     },
   },
   plugins: [],

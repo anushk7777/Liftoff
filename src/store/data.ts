@@ -8,6 +8,16 @@ export interface Task {
   link?: string;
 }
 
+export interface DailyTask {
+  id: string;
+  title: string;
+  category: string;
+  duration: string;
+  completed: boolean;
+  date: string; // ISO date string (start of day)
+  createdAt: string;
+}
+
 export interface Week {
   id: string;
   title: string;
