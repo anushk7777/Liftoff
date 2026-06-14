@@ -8,6 +8,7 @@ import PWAPrompt from './components/PWAPrompt';
 import PanicButton from './components/PanicButton';
 
 import Dashboard from './pages/Dashboard';
+import Coach from './pages/Coach';
 import Tasks from './pages/Tasks';
 import Focus from './pages/Focus';
 import BrainDump from './pages/BrainDump';
@@ -75,6 +76,7 @@ function Shell() {
           <div className="mx-auto w-full max-w-5xl px-5 py-7 sm:px-8 sm:py-10">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/coach" element={<Coach />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/focus" element={<Focus />} />
               <Route path="/brain-dump" element={<BrainDump />} />

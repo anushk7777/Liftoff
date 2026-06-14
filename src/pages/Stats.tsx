@@ -23,6 +23,7 @@ import {
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { countRoadmap } from '../lib/roadmap';
+import { getEvidenceStats } from '../lib/metrics';
 import { PageHeader, StatCard } from '../components/ui';
 
 export default function Stats() {
@@ -34,20 +35,27 @@ export default function Stats() {
     incrementProblems,
     sectionsCompleted,
     incrementSections,
-    projectsShipped,
     tasks,
     phases,
     focusSessions,
   } = useStore();
 
   const roadmap = useMemo(() => countRoadmap(phases), [phases]);
-  const tasksDone = tasks.filter((t) => t.status === 'done').length;
 
-  const focusTotal = useMemo(
+  // Every headline number is derived from real activity — evidence, not taps.
+  const evidence = useMemo(
     () =>
-      focusSessions.filter((s) => s.kind === 'focus').reduce((a, s) => a + s.durationMins, 0),
-    [focusSessions],
+      getEvidenceStats({
+        phases,
+        tasks,
+        focusSessions,
+        activityHistory,
+        problemsSolved,
+        sectionsCompleted,
+      }),
+    [phases, tasks, focusSessions, activityHistory, problemsSolved, sectionsCompleted],
   );
+  const focusTotal = evidence.focusMinutes;
   const focusWeek = useMemo(
     () =>
       focusSessions
@@ -110,29 +118,34 @@ export default function Stats() {
         />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        <StatCard label="Tasks done" value={tasksDone} icon={<Code className="w-4 h-4" />} />
-        <StatCard label="Projects shipped" value={projectsShipped} icon={<Trophy className="w-4 h-4" />} />
-        <StatCard label="Days active" value={activityHistory.length} icon={<Flame className="w-4 h-4" />} />
+        <StatCard label="Tasks done" value={evidence.tasksDone} icon={<Code className="w-4 h-4" />} />
+        <StatCard label="Projects shipped" value={evidence.projects} icon={<Trophy className="w-4 h-4" />} />
+        <StatCard label="Days active" value={evidence.activeDays} icon={<Flame className="w-4 h-4" />} />
         <StatCard label="Focus this week" value={`${focusWeek}m`} icon={<Timer className="w-4 h-4" />} />
       </div>
 
-      {/* Manual counters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+      {/* Evidence-based counters: derived from completed work, with an option
+          to log reps you did outside the app. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
         <Counter
           icon={<Code className="w-5 h-5" />}
           label="Problems solved"
-          value={problemsSolved}
+          value={evidence.problems}
           onInc={() => incrementProblems(1)}
           onDec={() => incrementProblems(-1)}
         />
         <Counter
           icon={<BookOpen className="w-5 h-5" />}
           label="Sections completed"
-          value={sectionsCompleted}
+          value={evidence.sections}
           onInc={() => incrementSections(1)}
           onDec={() => incrementSections(-1)}
         />
       </div>
+      <p className="text-xs text-ink-subtle mb-8">
+        Auto-counted from completed DSA / course tasks and roadmap items. Use +/− only to log reps
+        done outside Liftoff.
+      </p>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">

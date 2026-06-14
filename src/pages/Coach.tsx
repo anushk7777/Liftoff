@@ -1,0 +1,158 @@
+import { useMemo } from 'react';
+import { Sparkles, Brain, Clock, TrendingUp, ShieldCheck } from 'lucide-react';
+import { useStore } from '../store/useStore';
+import { cn } from '../lib/utils';
+import { buildProfile, getSuggestions, formatHour } from '../lib/coach';
+import type { CoachState } from '../lib/coach';
+import { PageHeader } from '../components/ui';
+import { SuggestionRow } from '../components/Coach';
+import { useCoachActions } from '../components/useCoachActions';
+
+export default function Coach() {
+  const phases = useStore((s) => s.phases);
+  const tasks = useStore((s) => s.tasks);
+  const focusSessions = useStore((s) => s.focusSessions);
+  const ideas = useStore((s) => s.ideas);
+  const activityHistory = useStore((s) => s.activityHistory);
+  const streak = useStore((s) => s.streak);
+  const pomodoro = useStore((s) => s.pomodoro);
+
+  const onAct = useCoachActions();
+
+  const { profile, suggestions } = useMemo(() => {
+    const state: CoachState = {
+      phases,
+      tasks,
+      focusSessions,
+      ideas,
+      activityHistory,
+      streak,
+      pomodoro,
+    };
+    const profile = buildProfile(state);
+    return { profile, suggestions: getSuggestions(state, profile) };
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro]);
+
+  const learning = profile.dataPoints < 8;
+
+  return (
+    <div className="animate-rise">
+      <PageHeader
+        title="Coach"
+        subtitle="Personalised, evidence-based guidance — learned from your own activity."
+        icon={<Sparkles className="w-5 h-5" />}
+      />
+
+      {/* How it works */}
+      <div className="card p-4 mb-6 flex items-start gap-3 bg-accent-soft/30">
+        <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+        <p className="text-sm text-ink-muted">
+          The coach re-trains on your data every time you open it — entirely on this device.
+          {learning
+            ? ' It’s still getting to know you; complete tasks and run a few focus sessions to sharpen its advice.'
+            : ' The more you do, the sharper it gets.'}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Suggestions */}
+        <section className="lg:col-span-2">
+          <h2 className="section-label mb-2">Your next moves</h2>
+          <div className="card p-1.5">
+            {suggestions.map((s) => (
+              <SuggestionRow key={s.id} suggestion={s} onAct={onAct} />
+            ))}
+          </div>
+
+          {/* Insights */}
+          <h2 className="section-label mb-2 mt-6">What the coach has learned</h2>
+          <div className="card p-4 space-y-2">
+            {profile.insights.map((line, i) => (
+              <div key={i} className="flex items-start gap-2.5 text-sm text-ink">
+                <Brain className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                {line}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Profile panels */}
+        <aside className="space-y-6">
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="w-4 h-4 text-ink-muted" />
+              <h3 className="section-label">Focus by hour</h3>
+            </div>
+            <HourHistogram histogram={profile.hourHistogram} peaks={profile.peakHours} />
+            <p className="text-xs text-ink-subtle mt-3">
+              {profile.peakHours.length
+                ? `Peak: ${profile.peakHours.map(formatHour).join(', ')}`
+                : 'Run focus sessions to reveal your peak hours.'}
+            </p>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-ink-muted" />
+              <h3 className="section-label">Strongest areas</h3>
+            </div>
+            {profile.topCategories.length === 0 ? (
+              <p className="text-xs text-ink-subtle">Complete categorised tasks to see this.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {profile.topCategories.map((c) => (
+                  <div key={c.name}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-ink font-medium">{c.name}</span>
+                      <span className="text-ink-subtle">{Math.round(c.weight * 100)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-elevated overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-accent transition-all"
+                        style={{ width: `${Math.max(6, c.weight * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card p-4 grid grid-cols-2 gap-3">
+            <Stat label="Tasks / day" value={profile.tasksPerDay.toFixed(1)} />
+            <Stat label="Avg session" value={`${profile.avgSessionMins}m`} />
+            <Stat label="Total focus" value={`${Math.floor(profile.totalFocusMin / 60)}h`} />
+            <Stat label="Data points" value={profile.dataPoints} />
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function HourHistogram({ histogram, peaks }: { histogram: number[]; peaks: number[] }) {
+  return (
+    <div className="flex items-end gap-[2px] h-20">
+      {histogram.map((v, h) => (
+        <div
+          key={h}
+          title={`${formatHour(h)} · ${Math.round(v * 100)}`}
+          className={cn(
+            'flex-1 rounded-sm transition-all',
+            peaks.includes(h) ? 'bg-accent' : 'bg-elevated',
+          )}
+          style={{ height: `${Math.max(4, v * 100)}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="font-display text-xl font-bold text-ink">{value}</p>
+      <p className="text-[11px] uppercase tracking-wider text-ink-subtle">{label}</p>
+    </div>
+  );
+}

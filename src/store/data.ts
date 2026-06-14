@@ -41,6 +41,8 @@ export interface TodoTask {
   dueDate?: string; // ISO start-of-day, optional
   createdAt: string;
   completedAt?: string;
+  // Link back to a roadmap item, so completing the task advances the roadmap.
+  sourceRoadmap?: { phaseId: string; weekId: string; taskId: string };
 }
 
 // ---- Brain dump (quick capture) -----------------------------------------

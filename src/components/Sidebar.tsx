@@ -12,6 +12,7 @@ import {
   PanelLeft,
   Moon,
   Sun,
+  Sparkles,
 } from 'lucide-react';
 import { differenceInCalendarDays } from 'date-fns';
 import { useStore } from '../store/useStore';
@@ -19,6 +20,7 @@ import { cn } from '../lib/utils';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/coach', label: 'Coach', icon: Sparkles },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/focus', label: 'Focus', icon: Timer },
   { to: '/brain-dump', label: 'Brain Dump', icon: Lightbulb },

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Map,
   ChevronDown,
@@ -7,12 +8,17 @@ import {
   Upload,
   Sparkles,
   ExternalLink,
+  List,
+  Workflow,
+  ListPlus,
+  Timer,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import type { Phase, TaskType } from '../store/data';
 import { parseRoadmap, countRoadmap } from '../lib/roadmap';
 import { PageHeader, ProgressBar, Modal } from '../components/ui';
+import RoadmapJourney, { type NodeRef } from '../components/RoadmapJourney';
 
 const TYPE_COLOR: Record<TaskType, string> = {
   dsa: 'text-accent',
@@ -37,21 +43,54 @@ Week 5
 - [dsa] Recursion`;
 
 export default function Roadmap() {
-  const { phases, toggleRoadmapTask, replaceRoadmap, appendRoadmap, resetRoadmap } = useStore();
+  const { phases, toggleRoadmapTask, replaceRoadmap, appendRoadmap, resetRoadmap, tasks, addTaskFromRoadmap } =
+    useStore();
+  const navigate = useNavigate();
   const [importOpen, setImportOpen] = useState(false);
+  const [view, setView] = useState<'journey' | 'list'>(
+    () => (localStorage.getItem('liftoff_roadmap_view') as 'journey' | 'list') || 'journey',
+  );
+  const [selected, setSelected] = useState<NodeRef | null>(null);
 
   const overall = useMemo(() => countRoadmap(phases), [phases]);
+
+  // Keys of roadmap items that already have a linked daily task.
+  const addedKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of tasks)
+      if (t.sourceRoadmap)
+        s.add(`${t.sourceRoadmap.phaseId}:${t.sourceRoadmap.weekId}:${t.sourceRoadmap.taskId}`);
+    return s;
+  }, [tasks]);
+
+  const setViewPersist = (v: 'journey' | 'list') => {
+    localStorage.setItem('liftoff_roadmap_view', v);
+    setView(v);
+  };
+
+  // Re-read the selected node's live state (completion may change under it).
+  const liveSelected = selected ? findLiveNode(phases, selected) : null;
 
   return (
     <div className="animate-rise">
       <PageHeader
         title="Roadmap"
-        subtitle="Your 6-month flight plan, integrated with your daily work."
+        subtitle="Your 6-month flight plan. Tap any node to act on it."
         icon={<Map className="w-5 h-5" />}
         actions={
-          <button onClick={() => setImportOpen(true)} className="btn btn-primary">
-            <Upload className="w-4 h-4" /> Import roadmap
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-elevated border border-border">
+              <ViewBtn active={view === 'journey'} onClick={() => setViewPersist('journey')} icon={<Workflow className="w-4 h-4" />}>
+                Journey
+              </ViewBtn>
+              <ViewBtn active={view === 'list'} onClick={() => setViewPersist('list')} icon={<List className="w-4 h-4" />}>
+                List
+              </ViewBtn>
+            </div>
+            <button onClick={() => setImportOpen(true)} className="btn btn-primary">
+              <Upload className="w-4 h-4" /> Import
+            </button>
+          </div>
         }
       />
 
@@ -68,16 +107,93 @@ export default function Roadmap() {
         <ProgressBar value={overall.percent} />
       </div>
 
-      <div className="space-y-3">
-        {phases.map((phase, i) => (
-          <PhaseCard
-            key={phase.id}
-            phase={phase}
-            defaultOpen={i === 0}
-            onToggle={toggleRoadmapTask}
-          />
-        ))}
-      </div>
+      {view === 'journey' ? (
+        <RoadmapJourney phases={phases} onNodeClick={setSelected} addedKeys={addedKeys} />
+      ) : (
+        <div className="space-y-3">
+          {phases.map((phase, i) => (
+            <PhaseCard
+              key={phase.id}
+              phase={phase}
+              defaultOpen={i === 0}
+              onToggle={toggleRoadmapTask}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Node action sheet */}
+      <Modal open={!!liveSelected} onClose={() => setSelected(null)} maxWidth="max-w-md">
+        {liveSelected && (
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={cn('text-[11px] font-semibold uppercase tracking-wider', TYPE_COLOR[liveSelected.task.type])}>
+                  {liveSelected.task.type}
+                </span>
+                <span className="text-[11px] text-ink-subtle">
+                  · {cleanPhaseTitle(liveSelected.phaseTitle)} · {liveSelected.weekTitle}
+                </span>
+              </div>
+              <h2 className="font-display text-xl font-bold text-ink leading-snug">
+                {liveSelected.task.title}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                onClick={() =>
+                  toggleRoadmapTask(liveSelected.phaseId, liveSelected.weekId, liveSelected.task.id)
+                }
+                className={cn('btn w-full justify-start', liveSelected.task.completed ? 'btn-secondary' : 'btn-primary')}
+              >
+                <Check className="w-4 h-4" />
+                {liveSelected.task.completed ? 'Mark as not done' : 'Mark complete'}
+              </button>
+
+              {(() => {
+                const key = `${liveSelected.phaseId}:${liveSelected.weekId}:${liveSelected.task.id}`;
+                const added = addedKeys.has(key);
+                return (
+                  <button
+                    onClick={() => {
+                      addTaskFromRoadmap(liveSelected.phaseId, liveSelected.weekId, liveSelected.task.id);
+                      setSelected(null);
+                      navigate('/tasks');
+                    }}
+                    disabled={added}
+                    className="btn btn-secondary w-full justify-start disabled:opacity-50"
+                  >
+                    <ListPlus className="w-4 h-4" />
+                    {added ? 'Already in your tasks' : 'Add to my tasks'}
+                  </button>
+                );
+              })()}
+
+              <button
+                onClick={() => {
+                  setSelected(null);
+                  navigate('/focus');
+                }}
+                className="btn btn-secondary w-full justify-start"
+              >
+                <Timer className="w-4 h-4" /> Focus on this
+              </button>
+
+              {liveSelected.task.link && (
+                <a
+                  href={liveSelected.task.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary w-full justify-start"
+                >
+                  <ExternalLink className="w-4 h-4" /> Open resource
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <ImportModal
         open={importOpen}
@@ -98,6 +214,42 @@ export default function Roadmap() {
         }}
       />
     </div>
+  );
+}
+
+const cleanPhaseTitle = (s: string) => s.replace(/^phase\s+[a-z]\s*[—-]\s*/i, '').trim() || s;
+
+// Resolve a selected node against the current phases so the action sheet always
+// reflects live completion state.
+function findLiveNode(phases: Phase[], selected: NodeRef): NodeRef | null {
+  const p = phases.find((x) => x.id === selected.phaseId);
+  const w = p?.weeks.find((x) => x.id === selected.weekId);
+  const t = w?.tasks.find((x) => x.id === selected.task.id);
+  return t ? { ...selected, task: t } : null;
+}
+
+function ViewBtn({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors',
+        active ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+      )}
+    >
+      {icon}
+      <span className="hidden sm:inline">{children}</span>
+    </button>
   );
 }
 
