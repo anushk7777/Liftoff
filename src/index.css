@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-deep: #0E0A14;
+    --surface: #1C1622;
+    --surface-raised: #251D2E;
+    
+    --accent: #FF7A59;
+    --accent-2: #FFB089;
+    --success: #5BD6A0;
+    
+    --text: #F4EFEA;
+    --text-muted: #9A8FA6;
+
+    --font-display: 'Fredoka', 'Clash Display', 'General Sans', 'Space Grotesk', sans-serif;
+    --font-body: 'Nunito', 'Inter', 'Geist', sans-serif;
+  }
+
+  body {
+    @apply bg-[var(--bg-deep)] text-[var(--text)] antialiased;
+    font-family: var(--font-body);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+}
+
+@layer utilities {
+  /* Elevated Cards with Inner Glow (lit from above) */
+  .premium-card {
+    @apply bg-[var(--surface)] rounded-[20px] relative transition-transform duration-300;
+    box-shadow: 
+      0 10px 30px -10px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255,255,255,0.02);
+  }
+
+  .premium-card-raised {
+    @apply bg-[var(--surface-raised)] rounded-[16px] relative transition-transform duration-300;
+    box-shadow: 
+      0 8px 20px -8px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Primary Action Button (Flame Gradient) */
+  .btn-primary {
+    @apply bg-gradient-to-br from-[var(--accent)] to-[var(--accent-2)] text-[#0E0A14] rounded-xl font-bold uppercase tracking-wider transition-all duration-200 active:scale-[0.95];
+    box-shadow: 
+      0 8px 20px -4px rgba(255, 122, 89, 0.4),
+      inset 0 2px 2px rgba(255, 255, 255, 0.3);
+    font-family: var(--font-display);
+  }
+  .btn-primary:hover {
+    box-shadow: 
+      0 12px 25px -4px rgba(255, 122, 89, 0.5),
+      inset 0 2px 2px rgba(255, 255, 255, 0.3);
+  }
+  .btn-primary:active {
+    box-shadow: 
+      0 0px 0px rgba(255, 122, 89, 0.4),
+      inset 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Secondary Button (Ghost/Outline) */
+  .btn-secondary {
+    @apply bg-transparent text-[var(--text-muted)] rounded-xl font-bold uppercase tracking-wider transition-all duration-200 active:scale-[0.95] border border-[rgba(154,143,166,0.3)];
+    font-family: var(--font-display);
+  }
+  .btn-secondary:hover {
+    @apply bg-[rgba(255,255,255,0.03)] text-[var(--text)];
+    border-color: rgba(154,143,166,0.5);
+  }
+}
+
+/* Background Layers: Deep base + Starfield noise */
+.space-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-color: var(--bg-deep);
+  /* Very subtle radial glow in the center */
+  background-image: radial-gradient(circle at 50% 30%, rgba(255, 122, 89, 0.05) 0%, transparent 60%);
+}
+
+.starfield-noise {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.25;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}
