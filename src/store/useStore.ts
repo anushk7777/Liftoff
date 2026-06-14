@@ -52,6 +52,7 @@ interface AppState {
   deleteTask: (id: string) => void;
   cycleTaskStatus: (id: string) => void;
   setTaskStatus: (id: string, status: Status) => void;
+  addTaskFromRoadmap: (phaseId: string, weekId: string, taskId: string) => void;
 
   // Brain dump (quick capture)
   ideas: Idea[];
@@ -145,8 +146,7 @@ export const useStore = create<AppState>()((set, get) => ({
   toggleRoadmapTask: (phaseId, weekId, taskId) =>
     set((state) => {
       const newPhases = JSON.parse(JSON.stringify(state.phases)) as Phase[];
-      let completedMilestone = false;
-      let uncompletedMilestone = false;
+      let nowCompleted = false;
       for (const p of newPhases) {
         if (p.id !== phaseId) continue;
         for (const w of p.weeks) {
@@ -154,18 +154,24 @@ export const useStore = create<AppState>()((set, get) => ({
           for (const t of w.tasks) {
             if (t.id !== taskId) continue;
             t.completed = !t.completed;
-            if (t.type === 'milestone') {
-              if (t.completed) completedMilestone = true;
-              else uncompletedMilestone = true;
-            }
+            nowCompleted = t.completed;
           }
         }
       }
-      const updates: Partial<AppState> = { phases: newPhases };
-      if (completedMilestone) updates.projectsShipped = state.projectsShipped + 1;
-      else if (uncompletedMilestone)
-        updates.projectsShipped = Math.max(0, state.projectsShipped - 1);
-      return updates;
+      // Keep any linked daily task in sync with the roadmap.
+      const tasks = state.tasks.map((t) =>
+        t.sourceRoadmap &&
+        t.sourceRoadmap.phaseId === phaseId &&
+        t.sourceRoadmap.weekId === weekId &&
+        t.sourceRoadmap.taskId === taskId
+          ? {
+              ...t,
+              status: (nowCompleted ? 'done' : 'todo') as Status,
+              completedAt: nowCompleted ? nowISO() : undefined,
+            }
+          : t,
+      );
+      return { phases: newPhases, tasks };
     }),
   replaceRoadmap: (phases) => set({ phases }),
   appendRoadmap: (phases) => set((s) => ({ phases: [...s.phases, ...phases] })),
@@ -187,6 +193,7 @@ export const useStore = create<AppState>()((set, get) => ({
           dueDate: task.dueDate,
           createdAt: nowISO(),
           completedAt: task.status === 'done' ? nowISO() : undefined,
+          sourceRoadmap: task.sourceRoadmap,
         },
         ...state.tasks,
       ],
@@ -197,19 +204,56 @@ export const useStore = create<AppState>()((set, get) => ({
     })),
   deleteTask: (id) => set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
   setTaskStatus: (id, status) =>
-    set((state) => ({
-      tasks: state.tasks.map((t) =>
+    set((state) => {
+      const task = state.tasks.find((t) => t.id === id);
+      const tasks = state.tasks.map((t) =>
         t.id === id
           ? { ...t, status, completedAt: status === 'done' ? nowISO() : undefined }
           : t,
-      ),
-    })),
+      );
+      // Daily work flows into the roadmap: completing a linked task advances it.
+      let phases = state.phases;
+      if (task?.sourceRoadmap) {
+        phases = syncRoadmapCompletion(state.phases, task.sourceRoadmap, status === 'done');
+      }
+      return { tasks, phases };
+    }),
   cycleTaskStatus: (id) => {
     const order: Status[] = ['todo', 'doing', 'done'];
     const t = get().tasks.find((x) => x.id === id);
     if (!t) return;
     const next = order[(order.indexOf(t.status) + 1) % order.length];
     get().setTaskStatus(id, next);
+  },
+  addTaskFromRoadmap: (phaseId, weekId, taskId) => {
+    const state = get();
+    // Avoid duplicates: if a task already links to this roadmap item, do nothing.
+    const exists = state.tasks.some(
+      (t) =>
+        t.sourceRoadmap &&
+        t.sourceRoadmap.phaseId === phaseId &&
+        t.sourceRoadmap.weekId === weekId &&
+        t.sourceRoadmap.taskId === taskId,
+    );
+    if (exists) return;
+    let found: { title: string; type: string } | null = null;
+    for (const p of state.phases) {
+      if (p.id !== phaseId) continue;
+      for (const w of p.weeks) {
+        if (w.id !== weekId) continue;
+        const rt = w.tasks.find((t) => t.id === taskId);
+        if (rt) found = { title: rt.title, type: rt.type };
+      }
+    }
+    if (!found) return;
+    get().addTask({
+      title: found.title,
+      category: found.type.toUpperCase(),
+      priority: found.type === 'milestone' ? 'high' : 'medium',
+      status: 'todo',
+      dueDate: startOfDay(new Date()).toISOString(),
+      sourceRoadmap: { phaseId, weekId, taskId },
+    });
   },
 
   // ---- Brain dump ----
@@ -353,6 +397,34 @@ export const useStore = create<AppState>()((set, get) => ({
     }
   },
 }));
+
+// Set a specific roadmap task's completed flag (used when a linked daily task
+// is completed). Returns a new phases array; does nothing if not found.
+function syncRoadmapCompletion(
+  phases: Phase[],
+  ref: { phaseId: string; weekId: string; taskId: string },
+  completed: boolean,
+): Phase[] {
+  let changed = false;
+  const next = phases.map((p) => {
+    if (p.id !== ref.phaseId) return p;
+    return {
+      ...p,
+      weeks: p.weeks.map((w) => {
+        if (w.id !== ref.weekId) return w;
+        return {
+          ...w,
+          tasks: w.tasks.map((t) => {
+            if (t.id !== ref.taskId || t.completed === completed) return t;
+            changed = true;
+            return { ...t, completed };
+          }),
+        };
+      }),
+    };
+  });
+  return changed ? next : phases;
+}
 
 interface LegacyDailyTask {
   id?: string;

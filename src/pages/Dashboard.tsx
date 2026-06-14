@@ -14,7 +14,10 @@ import { format, startOfDay, isToday, differenceInCalendarDays } from 'date-fns'
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { countRoadmap } from '../lib/roadmap';
+import { buildProfile, getSuggestions } from '../lib/coach';
+import type { CoachState } from '../lib/coach';
 import { ProgressBar, PriorityDot } from '../components/ui';
+import { CoachCard } from '../components/Coach';
 
 function greeting() {
   const h = new Date().getHours();
@@ -36,8 +39,23 @@ export default function Dashboard() {
     targetDate,
     phases,
     focusSessions,
+    ideas,
+    pomodoro,
     addIdea,
   } = useStore();
+
+  const suggestions = useMemo(() => {
+    const state: CoachState = {
+      phases,
+      tasks,
+      focusSessions,
+      ideas,
+      activityHistory,
+      streak,
+      pomodoro,
+    };
+    return getSuggestions(state, buildProfile(state));
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro]);
 
   const [quickTask, setQuickTask] = useState('');
   const [quickIdea, setQuickIdea] = useState('');
@@ -129,6 +147,9 @@ export default function Dashboard() {
           value={`${roadmap.percent}%`}
         />
       </div>
+
+      {/* Coach */}
+      <CoachCard suggestions={suggestions} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Today's focus */}
