@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import {
@@ -31,7 +31,7 @@ import Habits from './pages/Habits';
 import Focus from './pages/Focus';
 import BrainDump from './pages/BrainDump';
 import Roadmap from './pages/Roadmap';
-import Stats from './pages/Stats';
+const Stats = lazy(() => import('./pages/Stats'));
 import SettingsPage from './pages/Settings';
 
 const MOBILE_NAV = [
@@ -90,7 +90,7 @@ function Shell() {
       <Route path="/focus" element={<Focus />} />
       <Route path="/brain-dump" element={<BrainDump />} />
       <Route path="/roadmap" element={<Roadmap />} />
-      <Route path="/stats" element={<Stats />} />
+      <Route path="/stats" element={<Suspense fallback={<div className="flex h-full items-center justify-center text-ink-subtle animate-pulse">Loading stats...</div>}><Stats /></Suspense>} />
       <Route path="/settings" element={<SettingsPage />} />
     </Routes>
   );
