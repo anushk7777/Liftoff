@@ -211,7 +211,7 @@
     color: var(--text);
   }
   .sidebar-item.active {
-    background-color: var(--accent-soft);
+    /* Background is rendered as an animated pill (framer-motion layoutId). */
     color: var(--accent);
   }
 

@@ -1,0 +1,19 @@
+import type { Transition, Variants } from 'framer-motion';
+import { useStore } from '../store/useStore';
+
+// One shared motion language. Spring-based for a tactile, ~120fps feel.
+export const pop: Transition = { type: 'spring', stiffness: 420, damping: 30, mass: 0.8 };
+export const springSoft: Transition = { type: 'spring', stiffness: 260, damping: 26 };
+export const fast: Transition = { duration: 0.18, ease: [0.21, 1, 0.4, 1] };
+
+// Page transition variants (subtle fade + lift).
+export const pageVariants: Variants = {
+  initial: { opacity: 0, y: 8 },
+  enter: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -6 },
+};
+
+// Read the user's reduce-motion preference so callers can opt out of animation.
+export function useReducedMotion(): boolean {
+  return useStore((s) => s.reduceMotion);
+}

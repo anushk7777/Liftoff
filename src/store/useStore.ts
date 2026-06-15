@@ -10,9 +10,12 @@ import type {
   PomodoroSettings,
   Priority,
   Status,
+  Habit,
+  HabitLog,
 } from './data';
 import { initialRoadmap, defaultPomodoro } from './data';
-import { startOfDay, format } from 'date-fns';
+import { startOfDay } from 'date-fns';
+import { dayKey, streakFromDays } from '../lib/streak';
 
 export interface ActivityLog {
   date: string; // ISO start-of-day
@@ -69,6 +72,14 @@ interface AppState {
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   togglePinNote: (id: string) => void;
+
+  // Habits
+  habits: Habit[];
+  habitLog: HabitLog[];
+  addHabit: (habit: Partial<Habit> & { name: string }) => void;
+  updateHabit: (id: string, updates: Partial<Habit>) => void;
+  deleteHabit: (id: string) => void;
+  toggleHabitToday: (id: string) => void;
 
   // Focus / Pomodoro
   pomodoro: PomodoroSettings;
@@ -200,6 +211,7 @@ export const useStore = create<AppState>()(
           category: task.category,
           estimate: task.estimate,
           dueDate: task.dueDate,
+          scheduledAt: task.scheduledAt,
           createdAt: nowISO(),
           completedAt: task.status === 'done' ? nowISO() : undefined,
           sourceRoadmap: task.sourceRoadmap,
@@ -311,6 +323,45 @@ export const useStore = create<AppState>()(
       notes: state.notes.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n)),
     })),
 
+  // ---- Habits ----
+  habits: [],
+  habitLog: [],
+  addHabit: (habit) =>
+    set((state) => ({
+      habits: [
+        {
+          id: uid(),
+          name: habit.name,
+          emoji: habit.emoji,
+          cadence: habit.cadence || 'daily',
+          daysOfWeek: habit.daysOfWeek,
+          scheduledTime: habit.scheduledTime,
+          createdAt: nowISO(),
+          archived: false,
+        },
+        ...state.habits,
+      ],
+    })),
+  updateHabit: (id, updates) =>
+    set((state) => ({
+      habits: state.habits.map((h) => (h.id === id ? { ...h, ...updates } : h)),
+    })),
+  deleteHabit: (id) =>
+    set((state) => ({
+      habits: state.habits.filter((h) => h.id !== id),
+      habitLog: state.habitLog.filter((l) => l.habitId !== id),
+    })),
+  toggleHabitToday: (id) =>
+    set((state) => {
+      const today = dayKey(new Date());
+      const done = state.habitLog.some((l) => l.habitId === id && l.date === today);
+      return {
+        habitLog: done
+          ? state.habitLog.filter((l) => !(l.habitId === id && l.date === today))
+          : [...state.habitLog, { habitId: id, date: today }],
+      };
+    }),
+
   // ---- Focus / Pomodoro ----
   pomodoro: defaultPomodoro,
   setPomodoro: (updates) => set((s) => ({ pomodoro: { ...s.pomodoro, ...updates } })),
@@ -352,33 +403,9 @@ export const useStore = create<AppState>()(
 
   recalculateStreak: () => {
     const { activityHistory, longestStreak } = get();
-    // Compare by local calendar-day key so timezone/DST shifts can't break it.
-    const dayKey = (d: string | Date) => format(new Date(d), 'yyyy-MM-dd');
     const days = new Set(activityHistory.map((l) => dayKey(l.date)));
-    if (days.size === 0) {
-      set({ streak: 0, freezeAvailable: true });
-      return;
-    }
-
-    let streak = 0;
-    let freeze = true; // one allowed gap, spent (not counted)
-    const cursor = startOfDay(new Date());
-    // Don't punish today before it's been logged.
-    if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
-
-    // Walk backwards from the most recent eligible day.
-    for (;;) {
-      if (days.has(dayKey(cursor))) {
-        streak++;
-      } else if (freeze) {
-        freeze = false; // spend the grace day without counting it
-      } else {
-        break;
-      }
-      cursor.setDate(cursor.getDate() - 1);
-    }
-
-    set({ streak, longestStreak: Math.max(longestStreak, streak), freezeAvailable: freeze });
+    const { streak, freezeAvailable } = streakFromDays(days);
+    set({ streak, longestStreak: Math.max(longestStreak, streak), freezeAvailable });
   },
 
   exportData: () => {
@@ -484,6 +511,8 @@ function migrate(data: Record<string, unknown>): Record<string, unknown> {
   if (!Array.isArray(out.ideas)) out.ideas = [];
   if (!Array.isArray(out.notes)) out.notes = [];
   if (!Array.isArray(out.focusSessions)) out.focusSessions = [];
+  if (!Array.isArray(out.habits)) out.habits = [];
+  if (!Array.isArray(out.habitLog)) out.habitLog = [];
   if (!out.pomodoro) out.pomodoro = defaultPomodoro;
 
   return out;

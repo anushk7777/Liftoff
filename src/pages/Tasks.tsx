@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
   Check,
@@ -7,12 +8,24 @@ import {
   CheckSquare,
   Circle,
   CircleDot,
+  Clock,
+  CalendarPlus,
 } from 'lucide-react';
 import { format, isToday, isPast, startOfDay } from 'date-fns';
 import { useStore } from '../store/useStore';
 import type { TodoTask, Priority, Status } from '../store/data';
 import { cn } from '../lib/utils';
+import { springSoft } from '../lib/motion';
+import { celebrate } from '../lib/celebrate';
+import { buildICS, downloadICS } from '../lib/ics';
 import { PageHeader, Modal, PriorityDot, PriorityBadge, EmptyState } from '../components/ui';
+
+const toLocalInput = (d: Date) => {
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+const slug = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'task';
 
 type Filter = 'all' | 'todo' | 'doing' | 'done';
 
@@ -58,6 +71,13 @@ export default function Tasks() {
     setModalOpen(true);
   };
 
+  // Cycle status, and reward the moment a task is completed.
+  const handleCycle = (t: TodoTask) => {
+    const willComplete = t.status === 'doing';
+    cycleTaskStatus(t.id);
+    if (willComplete) celebrate();
+  };
+
   return (
     <div className="animate-rise">
       <PageHeader
@@ -95,17 +115,27 @@ export default function Tasks() {
           hint="Create a task to start building momentum toward your goal."
         />
       ) : (
-        <div className="space-y-2">
-          {filtered.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onCycle={() => cycleTaskStatus(task.id)}
-              onEdit={() => openEdit(task)}
-              onDelete={() => deleteTask(task.id)}
-            />
-          ))}
-        </div>
+        <motion.div layout className="flex flex-col gap-2">
+          <AnimatePresence initial={false}>
+            {filtered.map((task) => (
+              <motion.div
+                key={task.id}
+                layout
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={springSoft}
+              >
+                <TaskRow
+                  task={task}
+                  onCycle={() => handleCycle(task)}
+                  onEdit={() => openEdit(task)}
+                  onDelete={() => deleteTask(task.id)}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
       )}
 
       <TaskModal
@@ -174,15 +204,22 @@ function TaskRow({
             {task.title}
           </p>
         </div>
-        {(task.notes || task.category || task.dueDate || task.estimate) && (
+        {(task.notes || task.category || task.dueDate || task.estimate || task.scheduledAt) && (
           <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-ink-subtle">
             {task.category && <span className="chip">{task.category}</span>}
             {task.estimate && <span>⏱ {task.estimate}</span>}
-            {task.dueDate && (
-              <span className={cn(overdue && 'text-danger font-medium')}>
-                {overdue ? 'Overdue · ' : 'Due '}
-                {format(new Date(task.dueDate), 'MMM d')}
+            {task.scheduledAt ? (
+              <span className={cn('inline-flex items-center gap-1', overdue && 'text-danger font-medium')}>
+                <Clock className="w-3 h-3" />
+                {format(new Date(task.scheduledAt), 'MMM d, h:mm a')}
               </span>
+            ) : (
+              task.dueDate && (
+                <span className={cn(overdue && 'text-danger font-medium')}>
+                  {overdue ? 'Overdue · ' : 'Due '}
+                  {format(new Date(task.dueDate), 'MMM d')}
+                </span>
+              )
             )}
             {task.notes && <span className="truncate max-w-[200px]">— {task.notes}</span>}
           </div>
@@ -190,6 +227,20 @@ function TaskRow({
       </div>
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {task.scheduledAt && (
+          <button
+            onClick={() =>
+              downloadICS(
+                `${slug(task.title)}.ics`,
+                buildICS({ title: task.title, start: task.scheduledAt!, description: 'Liftoff task' }),
+              )
+            }
+            title="Add to calendar"
+            className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
+          >
+            <CalendarPlus className="w-4 h-4" />
+          </button>
+        )}
         <button onClick={onEdit} className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover">
           <Pencil className="w-4 h-4" />
         </button>
@@ -246,10 +297,14 @@ function TaskForm({
   const [category, setCategory] = useState(editing?.category ?? '');
   const [estimate, setEstimate] = useState(editing?.estimate ?? '');
   const [dueDate, setDueDate] = useState(editing?.dueDate ? editing.dueDate.slice(0, 10) : '');
+  const [scheduledAt, setScheduledAt] = useState(
+    editing?.scheduledAt ? toLocalInput(new Date(editing.scheduledAt)) : '',
+  );
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    const sched = scheduledAt ? new Date(scheduledAt) : null;
     onSave({
       title: title.trim(),
       notes: notes.trim() || undefined,
@@ -257,7 +312,12 @@ function TaskForm({
       status,
       category: category.trim() || undefined,
       estimate: estimate.trim() || undefined,
-      dueDate: dueDate ? startOfDay(new Date(dueDate)).toISOString() : undefined,
+      scheduledAt: sched ? sched.toISOString() : undefined,
+      dueDate: sched
+        ? startOfDay(sched).toISOString()
+        : dueDate
+          ? startOfDay(new Date(dueDate)).toISOString()
+          : undefined,
     });
   };
 
@@ -316,11 +376,19 @@ function TaskForm({
               className="input"
             />
           </Field>
-          <Field label="Due date" className="col-span-2">
+          <Field label="Due date">
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              className="input"
+            />
+          </Field>
+          <Field label="Schedule (time)">
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
               className="input"
             />
           </Field>

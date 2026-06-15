@@ -16,6 +16,8 @@ export default function Coach() {
   const activityHistory = useStore((s) => s.activityHistory);
   const streak = useStore((s) => s.streak);
   const pomodoro = useStore((s) => s.pomodoro);
+  const habits = useStore((s) => s.habits);
+  const habitLog = useStore((s) => s.habitLog);
 
   const onAct = useCoachActions();
 
@@ -28,10 +30,12 @@ export default function Coach() {
       activityHistory,
       streak,
       pomodoro,
+      habits,
+      habitLog,
     };
     const profile = buildProfile(state);
     return { profile, suggestions: getSuggestions(state, profile) };
-  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro]);
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog]);
 
   const learning = profile.dataPoints < 8;
 

@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, SkipForward, Timer, Coffee, Brain } from 'lucid
 import { isToday } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
+import { beep } from '../lib/sound';
 import { PageHeader, StatCard } from '../components/ui';
 
 type Mode = 'focus' | 'shortBreak' | 'longBreak';
@@ -12,29 +13,6 @@ const MODE_META: Record<Mode, { label: string; icon: React.ReactNode }> = {
   shortBreak: { label: 'Short break', icon: <Coffee className="w-4 h-4" /> },
   longBreak: { label: 'Long break', icon: <Coffee className="w-4 h-4" /> },
 };
-
-function beep() {
-  try {
-    const Ctx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 660;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.6);
-  } catch {
-    /* ignore */
-  }
-}
 
 const FOCUS_KEY = 'liftoff_focus';
 interface SavedFocus {

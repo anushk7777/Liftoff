@@ -38,7 +38,8 @@ export interface TodoTask {
   status: Status;
   category?: string;
   estimate?: string; // e.g. "30m", "2h"
-  dueDate?: string; // ISO start-of-day, optional
+  dueDate?: string; // ISO start-of-day, optional (day-level)
+  scheduledAt?: string; // ISO datetime, optional (time-specific schedule / reminder)
   createdAt: string;
   completedAt?: string;
   // Link back to a roadmap item, so completing the task advances the roadmap.
@@ -61,6 +62,23 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   pinned: boolean;
+}
+
+// ---- Habits (recurring) -------------------------------------------------
+export interface Habit {
+  id: string;
+  name: string;
+  emoji?: string;
+  cadence: 'daily' | 'weekly';
+  daysOfWeek?: number[]; // for weekly cadence: 0=Sun … 6=Sat
+  scheduledTime?: string; // optional "HH:mm" implementation-intention cue
+  createdAt: string;
+  archived: boolean;
+}
+
+export interface HabitLog {
+  habitId: string;
+  date: string; // local yyyy-MM-dd
 }
 
 // ---- Focus / Pomodoro ---------------------------------------------------

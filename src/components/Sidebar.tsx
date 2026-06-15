@@ -14,15 +14,19 @@ import {
   Sun,
   Sparkles,
   Search,
+  Repeat,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { differenceInCalendarDays } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
+import { springSoft } from '../lib/motion';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/coach', label: 'Coach', icon: Sparkles },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/habits', label: 'Habits', icon: Repeat },
   { to: '/focus', label: 'Focus', icon: Timer },
   { to: '/brain-dump', label: 'Brain Dump', icon: Lightbulb },
   { to: '/roadmap', label: 'Roadmap', icon: Map },
@@ -112,11 +116,22 @@ export default function Sidebar({
             onClick={onNavigate}
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
-              cn('sidebar-item', isActive && 'active', collapsed && 'justify-center px-0')
+              cn('sidebar-item relative', isActive && 'active', collapsed && 'justify-center px-0')
             }
           >
-            <Icon className="w-[18px] h-[18px] shrink-0" />
-            {!collapsed && <span className="truncate">{label}</span>}
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <motion.span
+                    layoutId="navPill"
+                    className="absolute inset-0 rounded-[7px] bg-accent-soft"
+                    transition={springSoft}
+                  />
+                )}
+                <Icon className="w-[18px] h-[18px] shrink-0 relative z-10" />
+                {!collapsed && <span className="truncate relative z-10">{label}</span>}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -140,7 +155,11 @@ export default function Sidebar({
           onClick={onNavigate}
           title={collapsed ? 'Settings' : undefined}
           className={({ isActive }) =>
-            cn('sidebar-item', isActive && 'active', collapsed && 'justify-center px-0')
+            cn(
+              'sidebar-item',
+              isActive && 'active bg-accent-soft',
+              collapsed && 'justify-center px-0',
+            )
           }
         >
           <Settings className="w-[18px] h-[18px] shrink-0" />
