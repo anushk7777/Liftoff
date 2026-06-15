@@ -1,0 +1,127 @@
+// =========================================================================
+// Cross-device sync helpers.
+//
+// A user opts in by choosing a private "sync code" (passphrase). The cloud row
+// id is derived from it (sync_<sha256>), so every device that enters the same
+// code shares one workspace. The raw code is kept only in localStorage and is
+// never written to the cloud blob.
+// =========================================================================
+
+const SYNC_CODE_KEY = 'liftoff_sync_code';
+const SYNC_ID_KEY = 'liftoff_sync_id';
+const DEVICE_ID_KEY = 'liftoff_device_id';
+const UPDATED_AT_KEY = 'liftoff_updated_at';
+const EPOCH = '1970-01-01T00:00:00.000Z';
+
+const uid = () =>
+  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+
+// Stable random per-device id (the default workspace when no sync code is set).
+export function getDeviceId(): string {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = uid();
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+export const getSyncCode = (): string => localStorage.getItem(SYNC_CODE_KEY) || '';
+export const isSyncEnabled = (): boolean => getSyncCode().trim().length > 0;
+
+// Derive a deterministic, non-reversible workspace id from the passphrase.
+export async function hashSyncCode(code: string): Promise<string> {
+  const trimmed = code.trim();
+  try {
+    if (crypto?.subtle) {
+      const buf = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode('liftoff:' + trimmed),
+      );
+      const hex = Array.from(new Uint8Array(buf))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      return 'sync_' + hex.slice(0, 40);
+    }
+  } catch {
+    /* fall through to non-crypto fallback */
+  }
+  let h = 0;
+  for (let i = 0; i < trimmed.length; i++) h = (h * 31 + trimmed.charCodeAt(i)) | 0;
+  return 'sync_' + (h >>> 0).toString(16);
+}
+
+// Persist (or clear) the sync code and its derived workspace id.
+export async function setSyncCodeStorage(code: string): Promise<void> {
+  const trimmed = code.trim();
+  if (!trimmed) {
+    localStorage.removeItem(SYNC_CODE_KEY);
+    localStorage.removeItem(SYNC_ID_KEY);
+    return;
+  }
+  const id = await hashSyncCode(trimmed);
+  localStorage.setItem(SYNC_CODE_KEY, trimmed);
+  localStorage.setItem(SYNC_ID_KEY, id);
+}
+
+// The cloud row key: the shared sync workspace if enabled, else this device.
+export function getStorageId(): string {
+  if (isSyncEnabled()) return localStorage.getItem(SYNC_ID_KEY) || getDeviceId();
+  return getDeviceId();
+}
+
+export const getLocalUpdatedAt = (): string => localStorage.getItem(UPDATED_AT_KEY) || EPOCH;
+export const setLocalUpdatedAt = (ts: string) => localStorage.setItem(UPDATED_AT_KEY, ts);
+
+type AnyState = Record<string, unknown>;
+
+function asArray(s: AnyState, key: string): unknown[] {
+  return Array.isArray(s[key]) ? (s[key] as unknown[]) : [];
+}
+
+// Union two lists by a natural key; the first list wins on conflict.
+function unionBy(base: unknown[], other: unknown[], key: (x: unknown) => string): unknown[] {
+  const seen = new Set<string>();
+  const out: unknown[] = [];
+  for (const item of [...base, ...other]) {
+    const k = key(item);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
+}
+
+// Recency-guarded merge:
+//  - editable collections + settings: last-write-wins by timestamp (so edits
+//    AND deletions propagate cleanly).
+//  - append-only logs: unioned by natural key so nothing logged is ever lost.
+export function mergeState(
+  local: AnyState,
+  cloud: AnyState,
+  localTs: string,
+  cloudTs: string,
+): AnyState {
+  const cloudNewer = new Date(cloudTs).getTime() > new Date(localTs).getTime();
+  const base = cloudNewer ? cloud : local;
+  const other = cloudNewer ? local : cloud;
+  const k = (x: unknown) => (x ?? {}) as Record<string, unknown>;
+  return {
+    ...base,
+    focusSessions: unionBy(
+      asArray(base, 'focusSessions'),
+      asArray(other, 'focusSessions'),
+      (s) => String(k(s).id),
+    ),
+    activityHistory: unionBy(
+      asArray(base, 'activityHistory'),
+      asArray(other, 'activityHistory'),
+      (a) => String(k(a).date),
+    ),
+    habitLog: unionBy(
+      asArray(base, 'habitLog'),
+      asArray(other, 'habitLog'),
+      (l) => `${k(l).habitId}:${k(l).date}`,
+    ),
+  };
+}
