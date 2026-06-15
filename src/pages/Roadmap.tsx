@@ -310,7 +310,7 @@ function PhaseCard({
                       className={cn(
                         'mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0',
                         task.completed
-                          ? 'bg-accent border-accent text-white'
+                          ? 'bg-accent border-accent text-[var(--accent-text)]'
                           : 'border-ink-subtle hover:border-ink text-transparent',
                       )}
                     >

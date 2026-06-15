@@ -7,7 +7,6 @@ import {
   Map,
   BarChart3,
   Settings,
-  Rocket,
   PanelLeftClose,
   PanelLeft,
   Moon,
@@ -58,7 +57,7 @@ export default function Sidebar({
       <div className="flex items-center justify-between px-3 h-14 shrink-0">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0 shadow-sm">
-            <Rocket className="w-4 h-4 text-white" />
+            <Moon className="w-4 h-4 text-[var(--accent-text)]" />
           </div>
           {!collapsed && (
             <div className="leading-tight">

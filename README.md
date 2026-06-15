@@ -22,9 +22,11 @@ roadmap into a single, premium Notion-style workspace.
 ## Tech
 
 - React 19 + TypeScript + Vite
-- Tailwind CSS with a token-driven, dark-first design system (light mode included)
+- Tailwind CSS with a token-driven design system — a minimalist "LA twilight"
+  theme (violet night sky, dark-first) with a soft-dawn light mode
 - Zustand for state, with debounced cloud sync to Supabase (pseudonymous device ID)
-- Recharts, lucide-react, date-fns, PWA support
+- framer-motion (subtle motion), lucide-react, date-fns, PWA support
+- Charts are dependency-free inline SVG; the Claude coach SDK is lazy-loaded
 
 ## Develop
 

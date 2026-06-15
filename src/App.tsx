@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import {
   Menu,
-  Rocket,
+  Moon,
   Search,
   Plus,
   LayoutDashboard,
@@ -132,7 +132,7 @@ function Shell() {
           </button>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center">
-              <Rocket className="w-3.5 h-3.5 text-white" />
+              <Moon className="w-3.5 h-3.5 text-[var(--accent-text)]" />
             </div>
             <span className="font-display font-bold text-sm">Liftoff</span>
           </div>
@@ -194,7 +194,7 @@ function Shell() {
         onClick={() => setQuickAddOpen(true)}
         aria-label="Quick add task (Ctrl/Cmd N)"
         title="Quick add (Ctrl/⌘ N)"
-        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 w-14 h-14 rounded-full bg-accent text-white shadow-lg flex items-center justify-center hover:bg-accent-hover transition-colors active:scale-90"
+        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 w-14 h-14 rounded-full bg-accent text-[var(--accent-text)] shadow-lg flex items-center justify-center hover:bg-accent-hover transition-colors active:scale-90"
       >
         <Plus className="w-6 h-6" />
       </button>

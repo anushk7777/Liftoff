@@ -16,8 +16,6 @@ import { cn } from '../lib/utils';
 import { countRoadmap } from '../lib/roadmap';
 import { buildProfile, getSuggestions } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
-import { celebrate, bigCelebrate } from '../lib/celebrate';
-import { isMilestone } from '../lib/streak';
 import { ProgressBar, PriorityDot } from '../components/ui';
 import { CoachCard } from '../components/Coach';
 
@@ -89,13 +87,7 @@ export default function Dashboard() {
   const progress = todaysTasks.length ? Math.round((doneCount / todaysTasks.length) * 100) : 0;
 
   const handleComplete = (t: (typeof todaysTasks)[number]) => {
-    const willComplete = t.status === 'doing';
     cycleTaskStatus(t.id);
-    if (willComplete) {
-      // Clearing the whole day earns a bigger celebration.
-      if (todaysTasks.length > 0 && doneCount + 1 >= todaysTasks.length) bigCelebrate();
-      else celebrate();
-    }
   };
 
   const focusToday = useMemo(
@@ -110,13 +102,7 @@ export default function Dashboard() {
   const todayLogged = activityHistory.some((l) => l.date === todayStr);
 
   const handleLogDay = (type: 'full' | 'minimum') => {
-    const wasLogged = todayLogged;
     toggleLogDay(type);
-    if (!wasLogged) {
-      const s = useStore.getState().streak;
-      if (isMilestone(s)) bigCelebrate();
-      else celebrate();
-    }
   };
 
   const handleAddTask = (e: React.FormEvent) => {
@@ -208,7 +194,7 @@ export default function Dashboard() {
                     className={cn(
                       'w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0',
                       task.status === 'done'
-                        ? 'bg-accent border-accent text-white'
+                        ? 'bg-accent border-accent text-[var(--accent-text)]'
                         : task.status === 'doing'
                           ? 'border-warning text-warning'
                           : 'border-ink-subtle text-transparent hover:border-ink',
@@ -265,7 +251,7 @@ export default function Dashboard() {
               Just did the minimum
             </button>
             <p className="text-[11px] text-ink-subtle text-center mt-3">
-              {streak > 0 ? `🔥 ${streak}-day streak going` : 'Start your streak today'}
+              {streak > 0 ? `${streak}-day streak` : 'Start your streak today'}
             </p>
           </div>
 

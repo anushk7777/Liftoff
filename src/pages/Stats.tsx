@@ -1,13 +1,4 @@
 import { useMemo } from 'react';
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-} from 'recharts';
 import { subDays, format, startOfDay, isToday, isThisWeek } from 'date-fns';
 import {
   BarChart3,
@@ -26,6 +17,7 @@ import { cn } from '../lib/utils';
 import { countRoadmap } from '../lib/roadmap';
 import { getEvidenceStats } from '../lib/metrics';
 import { PageHeader, StatCard } from '../components/ui';
+import { Sparkline, MiniBars } from '../components/charts';
 
 export default function Stats() {
   const {
@@ -66,25 +58,25 @@ export default function Stats() {
   );
 
   const momentum = useMemo(() => {
-    const data = [];
+    const data: number[] = [];
     let cumulative = 0;
     for (let i = 29; i >= 0; i--) {
       const dateStr = startOfDay(subDays(new Date(), i)).toISOString();
       const log = activityHistory.find((l) => l.date === dateStr);
       if (log) cumulative += log.type === 'full' ? 1 : 0.5;
-      data.push({ day: format(subDays(new Date(), i), 'MMM d'), score: cumulative });
+      data.push(cumulative);
     }
     return data;
   }, [activityHistory]);
 
   const focusByDay = useMemo(() => {
-    const data = [];
+    const data: { label: string; value: number }[] = [];
     for (let i = 13; i >= 0; i--) {
       const day = subDays(new Date(), i);
       const mins = focusSessions
         .filter((s) => s.kind === 'focus' && format(new Date(s.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'))
         .reduce((a, s) => a + s.durationMins, 0);
-      data.push({ day: format(day, 'EEE'), mins });
+      data.push({ label: format(day, 'EEE'), value: mins });
     }
     return data;
   }, [focusSessions]);
@@ -159,54 +151,12 @@ export default function Stats() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div className="card p-5">
           <h3 className="section-label mb-4">30-day momentum</h3>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={momentum}>
-                <defs>
-                  <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  itemStyle={{ color: 'var(--accent)' }}
-                  labelStyle={{ color: 'var(--text-muted)' }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="score"
-                  stroke="var(--accent)"
-                  strokeWidth={2}
-                  fill="url(#grad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <Sparkline data={momentum} height={176} />
         </div>
 
         <div className="card p-5">
           <h3 className="section-label mb-4">Focus — last 14 days (min)</h3>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={focusByDay}>
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 10, fill: 'var(--text-subtle)' }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval={1}
-                />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  itemStyle={{ color: 'var(--accent)' }}
-                  labelStyle={{ color: 'var(--text-muted)' }}
-                  cursor={{ fill: 'var(--hover)' }}
-                />
-                <Bar dataKey="mins" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <MiniBars data={focusByDay} height={176} />
         </div>
       </div>
 
@@ -255,13 +205,6 @@ export default function Stats() {
     </div>
   );
 }
-
-const tooltipStyle = {
-  backgroundColor: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: '8px',
-  fontSize: '12px',
-};
 
 function Counter({
   icon,

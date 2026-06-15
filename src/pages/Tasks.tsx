@@ -15,7 +15,6 @@ import { useStore } from '../store/useStore';
 import type { TodoTask, Priority, Status } from '../store/data';
 import { cn } from '../lib/utils';
 import { springSoft } from '../lib/motion';
-import { celebrate } from '../lib/celebrate';
 import { PageHeader, Modal, PriorityDot, PriorityBadge, EmptyState } from '../components/ui';
 
 const toLocalInput = (d: Date) => {
@@ -67,11 +66,8 @@ export default function Tasks() {
     setModalOpen(true);
   };
 
-  // Cycle status, and reward the moment a task is completed.
   const handleCycle = (t: TodoTask) => {
-    const willComplete = t.status === 'doing';
     cycleTaskStatus(t.id);
-    if (willComplete) celebrate();
   };
 
   return (
@@ -179,7 +175,7 @@ function TaskRow({
         className={cn(
           'mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0',
           task.status === 'done'
-            ? 'bg-accent border-accent text-white'
+            ? 'bg-accent border-accent text-[var(--accent-text)]'
             : task.status === 'doing'
               ? 'border-warning text-warning'
               : 'border-ink-subtle text-ink-subtle hover:border-ink hover:text-ink',

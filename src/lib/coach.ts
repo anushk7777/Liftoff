@@ -68,7 +68,7 @@ export function getBriefing(state: CoachState, now = new Date()): Briefing {
     const behind = actualPct < 100;
     return {
       status: behind ? 'behind' : 'ahead',
-      headline: behind ? `Target date reached — ${actualPct}% done` : 'Goal complete 🎉',
+      headline: behind ? `Target date reached — ${actualPct}% done` : 'Goal complete',
       detail: `${actualPct}% of your roadmap is finished.`,
       expectedPct: 100,
       actualPct,
@@ -90,7 +90,7 @@ export function getBriefing(state: CoachState, now = new Date()): Briefing {
 
   const headline =
     status === 'ahead'
-      ? "You're ahead of schedule 🚀"
+      ? "You're ahead of schedule"
       : status === 'on-track'
         ? "You're on track"
         : `You're ~${weeksBehind < 2 ? weeksBehind.toFixed(1) : Math.round(weeksBehind)} week${weeksBehind >= 2 ? 's' : ''} behind`;
