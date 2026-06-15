@@ -9,7 +9,6 @@ import {
   Circle,
   CircleDot,
   Clock,
-  CalendarPlus,
 } from 'lucide-react';
 import { format, isToday, isPast, startOfDay } from 'date-fns';
 import { useStore } from '../store/useStore';
@@ -17,15 +16,12 @@ import type { TodoTask, Priority, Status } from '../store/data';
 import { cn } from '../lib/utils';
 import { springSoft } from '../lib/motion';
 import { celebrate } from '../lib/celebrate';
-import { buildICS, downloadICS } from '../lib/ics';
 import { PageHeader, Modal, PriorityDot, PriorityBadge, EmptyState } from '../components/ui';
 
 const toLocalInput = (d: Date) => {
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
 };
-const slug = (s: string) =>
-  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'task';
 
 type Filter = 'all' | 'todo' | 'doing' | 'done';
 
@@ -227,20 +223,6 @@ function TaskRow({
       </div>
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        {task.scheduledAt && (
-          <button
-            onClick={() =>
-              downloadICS(
-                `${slug(task.title)}.ics`,
-                buildICS({ title: task.title, start: task.scheduledAt!, description: 'Liftoff task' }),
-              )
-            }
-            title="Add to calendar"
-            className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
-          >
-            <CalendarPlus className="w-4 h-4" />
-          </button>
-        )}
         <button onClick={onEdit} className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover">
           <Pencil className="w-4 h-4" />
         </button>

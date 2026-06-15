@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
-import { Sparkles, Brain, Clock, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Sparkles, Brain, Clock, TrendingUp, ShieldCheck, Rocket, TriangleAlert } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { buildProfile, getSuggestions, formatHour } from '../lib/coach';
+import { buildProfile, getSuggestions, getBriefing, formatHour } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
-import { PageHeader } from '../components/ui';
+import { PageHeader, ProgressBar } from '../components/ui';
 import { SuggestionRow } from '../components/Coach';
 import { useCoachActions } from '../components/useCoachActions';
 
@@ -18,10 +18,11 @@ export default function Coach() {
   const pomodoro = useStore((s) => s.pomodoro);
   const habits = useStore((s) => s.habits);
   const habitLog = useStore((s) => s.habitLog);
+  const targetDate = useStore((s) => s.targetDate);
 
   const onAct = useCoachActions();
 
-  const { profile, suggestions } = useMemo(() => {
+  const { profile, suggestions, briefing } = useMemo(() => {
     const state: CoachState = {
       phases,
       tasks,
@@ -32,12 +33,19 @@ export default function Coach() {
       pomodoro,
       habits,
       habitLog,
+      targetDate,
     };
     const profile = buildProfile(state);
-    return { profile, suggestions: getSuggestions(state, profile) };
-  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog]);
+    return { profile, suggestions: getSuggestions(state, profile), briefing: getBriefing(state) };
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
 
   const learning = profile.dataPoints < 8;
+  const briefTone =
+    briefing.status === 'behind'
+      ? 'border-danger/40 bg-danger/10'
+      : briefing.status === 'ahead'
+        ? 'border-success/40 bg-success/10'
+        : 'border-accent/30 bg-accent-soft/40';
 
   return (
     <div className="animate-rise">
@@ -46,6 +54,33 @@ export default function Coach() {
         subtitle="Personalised, evidence-based guidance — learned from your own activity."
         icon={<Sparkles className="w-5 h-5" />}
       />
+
+      {/* Mission briefing — progress monitoring */}
+      <div className={cn('card p-5 mb-4 border', briefTone)}>
+        <div className="flex items-start gap-3">
+          {briefing.status === 'behind' ? (
+            <TriangleAlert className="w-5 h-5 text-danger shrink-0 mt-0.5" />
+          ) : (
+            <Rocket className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-display text-lg font-bold text-ink">{briefing.headline}</h2>
+              <span className="text-xs text-ink-subtle whitespace-nowrap">{briefing.daysLeft} days left</span>
+            </div>
+            <p className="text-sm text-ink-muted mt-0.5">{briefing.detail}</p>
+            {briefing.status !== 'idle' && (
+              <div className="mt-3">
+                <div className="flex justify-between text-[11px] text-ink-subtle mb-1">
+                  <span>Roadmap {briefing.actualPct}%</span>
+                  <span>Expected {Math.round(briefing.expectedPct)}%</span>
+                </div>
+                <ProgressBar value={briefing.actualPct} />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* How it works */}
       <div className="card p-4 mb-6 flex items-start gap-3 bg-accent-soft/30">

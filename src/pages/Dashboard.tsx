@@ -59,9 +59,10 @@ export default function Dashboard() {
       pomodoro,
       habits,
       habitLog,
+      targetDate,
     };
     return getSuggestions(state, buildProfile(state));
-  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog]);
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
 
   const [quickTask, setQuickTask] = useState('');
   const [quickIdea, setQuickIdea] = useState('');

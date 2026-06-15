@@ -22,6 +22,7 @@ import PanicButton from './components/PanicButton';
 import CommandPalette from './components/CommandPalette';
 import ErrorBoundary from './components/ErrorBoundary';
 import QuickAdd from './components/QuickAdd';
+import AlarmOverlay from './components/AlarmOverlay';
 
 import Dashboard from './pages/Dashboard';
 import Coach from './pages/Coach';
@@ -204,6 +205,7 @@ function Shell() {
       <AnimatePresence>
         {quickAddOpen && <QuickAdd key="quickadd" onClose={() => setQuickAddOpen(false)} />}
       </AnimatePresence>
+      <AlarmOverlay />
     </div>
   );
 }
