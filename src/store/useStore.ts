@@ -16,6 +16,15 @@ import type {
 import { initialRoadmap, defaultPomodoro } from './data';
 import { startOfDay } from 'date-fns';
 import { dayKey, streakFromDays } from '../lib/streak';
+import {
+  getDeviceId,
+  getStorageId,
+  getSyncCode,
+  setSyncCodeStorage,
+  getLocalUpdatedAt,
+  setLocalUpdatedAt,
+  mergeState,
+} from '../lib/sync';
 
 export interface ActivityLog {
   date: string; // ISO start-of-day
@@ -32,6 +41,12 @@ interface AppState {
   deviceId: string;
   setInitialized: (val: boolean) => void;
   loadFromDB: () => Promise<void>;
+
+  // Cross-device sync
+  syncCode: string;
+  setSyncCode: (code: string) => Promise<void>;
+  clearSyncCode: () => void;
+  syncNow: () => Promise<void>;
 
   // Settings
   targetDate: string;
@@ -105,16 +120,18 @@ interface AppState {
   importData: (jsonStr: string) => void;
 }
 
-const getDeviceId = () => {
-  let id = localStorage.getItem('liftoff_device_id');
-  if (!id) {
-    id = uid();
-    localStorage.setItem('liftoff_device_id', id);
-  }
-  return id;
-};
+const NON_PERSISTED = new Set(['_initialized', 'deviceId', 'syncCode']);
 
-const NON_PERSISTED = new Set(['_initialized', 'deviceId']);
+// The persisted/synced slice of state: everything except functions and the
+// runtime-only / device-local fields above (syncCode never leaves the device).
+function extractData(state: AppState): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(state)) {
+    if (typeof v === 'function' || NON_PERSISTED.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 export const useStore = create<AppState>()(
   persist(
@@ -123,25 +140,52 @@ export const useStore = create<AppState>()(
       deviceId: getDeviceId(),
       setInitialized: (val) => set({ _initialized: val }),
 
+      // ---- Cross-device sync ----
+      syncCode: getSyncCode(),
+      setSyncCode: async (code) => {
+        await setSyncCodeStorage(code);
+        set({ syncCode: code.trim() });
+        // Reset the recency clock so the shared workspace's data is pulled in,
+        // then merge + converge.
+        setLocalUpdatedAt('1970-01-01T00:00:00.000Z');
+        await get().loadFromDB();
+      },
+      clearSyncCode: () => {
+        void setSyncCodeStorage('');
+        set({ syncCode: '' });
+      },
+      syncNow: async () => {
+        await get().loadFromDB();
+      },
+
       loadFromDB: async () => {
         // Local persistence is the source of truth. Only pull from the cloud
-        // when Supabase is actually configured.
+        // when Supabase is configured. We MERGE (recency-guarded) rather than
+        // blindly overwrite, so a freshly opened device never wipes the cloud
+        // and logged history from any device is preserved.
         if (!isSupabaseConfigured) {
           set({ _initialized: true });
           get().recalculateStreak();
           return;
         }
-        const state = get();
         try {
+          const id = getStorageId();
           const { data } = await supabase
             .from('user_data')
-            .select('data')
-            .eq('id', state.deviceId)
+            .select('data, updated_at')
+            .eq('id', id)
             .single();
 
           if (data && data.data) {
-            const loaded = migrate(data.data);
-            set({ ...loaded, _initialized: true, deviceId: state.deviceId });
+            const cloud = migrate(data.data);
+            const localSnap = extractData(get());
+            const merged = mergeState(
+              localSnap,
+              cloud,
+              getLocalUpdatedAt(),
+              data.updated_at || '1970-01-01T00:00:00.000Z',
+            );
+            set({ ...(merged as Partial<AppState>), _initialized: true });
           } else {
             set({ _initialized: true });
           }
@@ -408,15 +452,7 @@ export const useStore = create<AppState>()(
     set({ streak, longestStreak: Math.max(longestStreak, streak), freezeAvailable });
   },
 
-  exportData: () => {
-    const state = get();
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(state)) {
-      if (typeof v === 'function' || NON_PERSISTED.has(k)) continue;
-      out[k] = v;
-    }
-    return JSON.stringify(out, null, 2);
-  },
+  exportData: () => JSON.stringify(extractData(get()), null, 2),
 
   importData: (jsonStr) => {
     try {
@@ -438,11 +474,11 @@ export const useStore = create<AppState>()(
           Object.entries(s).filter(([k, v]) => typeof v !== 'function' && !NON_PERSISTED.has(k)),
         ) as unknown as AppState,
       migrate: (persisted) => migrate(persisted as Record<string, unknown>) as unknown as AppState,
+      // Note: we intentionally do NOT flip _initialized here. loadFromDB() does
+      // that only after the first cloud merge, so a configured device can't push
+      // local defaults to the shared workspace before pulling (startup race).
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.setInitialized(true);
-          state.recalculateStreak();
-        }
+        if (state) state.recalculateStreak();
       },
     },
   ),
@@ -518,27 +554,35 @@ function migrate(data: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-// Debounced cloud sync — only when Supabase is configured. Local persistence
-// (zustand persist) handles offline-first saving on its own.
+// Debounced cloud sync — only when Supabase is configured and the first cloud
+// merge has completed (_initialized). Local persistence (zustand persist)
+// handles offline-first saving on its own.
 let syncTimeout: ReturnType<typeof setTimeout>;
 useStore.subscribe((state) => {
   if (!isSupabaseConfigured || !state._initialized) return;
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(async () => {
     try {
-      const dataToSync: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(state)) {
-        if (typeof v === 'function' || NON_PERSISTED.has(k)) continue;
-        dataToSync[k] = v;
-      }
-      await supabase
-        .from('user_data')
-        .upsert(
-          { id: state.deviceId, data: dataToSync, updated_at: nowISO() },
-          { onConflict: 'id' },
-        );
+      const ts = nowISO();
+      await supabase.from('user_data').upsert(
+        { id: getStorageId(), data: extractData(state), updated_at: ts },
+        { onConflict: 'id' },
+      );
+      setLocalUpdatedAt(ts); // mirror for the recency-guarded merge on next load
     } catch (e) {
       console.error('Background sync failed', e);
     }
   }, 1000);
 });
+
+// Pull (merge) the shared workspace when returning to the tab, so switching
+// between devices stays fresh without a realtime websocket.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    const s = useStore.getState();
+    if (isSupabaseConfigured && s.syncCode.trim() && s._initialized) {
+      void s.syncNow();
+    }
+  });
+}

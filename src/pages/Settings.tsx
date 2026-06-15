@@ -9,6 +9,7 @@ import {
   Target,
   Bell,
   KeyRound,
+  RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
@@ -31,6 +32,10 @@ export default function Settings() {
     exportData,
     importData,
     resetRoadmap,
+    syncCode,
+    setSyncCode,
+    clearSyncCode,
+    syncNow,
   } = useStore();
 
   const [importStatus, setImportStatus] = useState('');
@@ -38,6 +43,31 @@ export default function Settings() {
   const [apiKey, setApiKeyState] = useState(() => getKey());
   const [coachModel, setCoachModelState] = useState(() => getModel());
   const [coachStatus, setCoachStatus] = useState('');
+  const [syncInput, setSyncInput] = useState(syncCode);
+  const [syncStatus, setSyncStatus] = useState('');
+  const [syncing, setSyncing] = useState(false);
+
+  const enableSync = async () => {
+    if (!syncInput.trim()) return;
+    setSyncing(true);
+    await setSyncCode(syncInput.trim());
+    setSyncing(false);
+    setSyncStatus('Synced. Enter the same code on your other devices.');
+    setTimeout(() => setSyncStatus(''), 5000);
+  };
+  const disconnectSync = () => {
+    clearSyncCode();
+    setSyncInput('');
+    setSyncStatus('Disconnected. Your data stays on this device.');
+    setTimeout(() => setSyncStatus(''), 5000);
+  };
+  const manualSync = async () => {
+    setSyncing(true);
+    await syncNow();
+    setSyncing(false);
+    setSyncStatus('Synced.');
+    setTimeout(() => setSyncStatus(''), 3000);
+  };
 
   const saveCoach = () => {
     setKey(apiKey);
@@ -160,6 +190,51 @@ export default function Settings() {
           <p className="text-xs text-ink-subtle">
             Scheduled tasks also ring an in-app alarm (with snooze) while Liftoff is open.
           </p>
+        </Section>
+
+        {/* Sync across devices */}
+        <Section title="Sync across devices" icon={<RefreshCw className="w-4 h-4" />}>
+          {!isSupabaseConfigured ? (
+            <p className="text-xs text-ink-subtle">
+              Cross-device sync needs cloud credentials. Add your Supabase keys (see the README),
+              then a sync option appears here. Until then, your data is saved on this device.
+            </p>
+          ) : syncCode.trim() ? (
+            <div className="space-y-3">
+              <Row label="Synced" desc="This device shares a workspace with anything using the same code.">
+                <span className="chip text-success border-success/30 bg-success/10">Connected</span>
+              </Row>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button onClick={manualSync} disabled={syncing} className="btn btn-secondary flex-1 disabled:opacity-50">
+                  <RefreshCw className={cn('w-4 h-4', syncing && 'animate-spin')} /> Sync now
+                </button>
+                <button onClick={disconnectSync} className="btn btn-danger flex-1">
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-ink-subtle">
+                Choose a private sync code, then enter the <strong>same code</strong> on your other
+                devices to share one workspace. Anyone with the code can access this data — pick a
+                strong, unique passphrase.
+              </p>
+              <input
+                type="password"
+                value={syncInput}
+                onChange={(e) => setSyncInput(e.target.value)}
+                placeholder="Your sync code / passphrase"
+                autoComplete="off"
+                className="input"
+              />
+              <button onClick={enableSync} disabled={syncing || !syncInput.trim()} className="btn btn-primary disabled:opacity-50">
+                {syncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Enable sync
+              </button>
+            </div>
+          )}
+          {syncStatus && <p className="text-xs text-success font-medium mt-2">{syncStatus}</p>}
         </Section>
 
         {/* Data */}
