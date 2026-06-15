@@ -106,7 +106,7 @@ export default function RoadmapJourney({
                           'absolute left-1/2 -translate-x-1/2 z-10 rounded-full flex items-center justify-center transition-all duration-200 ring-2 ring-offset-2 ring-offset-bg active:scale-95',
                           isMilestone ? 'w-12 h-12' : 'w-9 h-9',
                           task.completed
-                            ? 'bg-accent text-white ring-accent shadow-md'
+                            ? 'bg-accent text-[var(--accent-text)] ring-accent shadow-md'
                             : cn(
                                 'bg-surface text-ink-subtle hover:text-ink hover:scale-105',
                                 TYPE_RING[task.type],

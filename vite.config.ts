@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Liftoff',
         short_name: 'Liftoff',
         description: '6-month full-stack developer roadmap tracker',
-        theme_color: '#0A0A0A',
-        background_color: '#0A0A0A',
+        theme_color: '#0b0a16',
+        background_color: '#0b0a16',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

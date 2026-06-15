@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Sparkles, Brain, Clock, TrendingUp, ShieldCheck, Rocket, TriangleAlert } from 'lucide-react';
+import { Sparkles, Brain, Clock, TrendingUp, ShieldCheck, Moon, TriangleAlert } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { buildProfile, getSuggestions, getBriefing, formatHour } from '../lib/coach';
@@ -62,7 +62,7 @@ export default function Coach() {
           {briefing.status === 'behind' ? (
             <TriangleAlert className="w-5 h-5 text-danger shrink-0 mt-0.5" />
           ) : (
-            <Rocket className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+            <Moon className="w-5 h-5 text-accent shrink-0 mt-0.5" />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-3">

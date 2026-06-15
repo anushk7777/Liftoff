@@ -122,7 +122,7 @@ export default function CoachChat() {
                 className={cn(
                   'max-w-[85%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap leading-relaxed',
                   m.role === 'user'
-                    ? 'bg-accent text-white rounded-br-sm'
+                    ? 'bg-accent text-[var(--accent-text)] rounded-br-sm'
                     : 'bg-elevated text-ink rounded-bl-sm',
                 )}
               >

@@ -5,8 +5,7 @@ import { Repeat, Plus, Check, Flame, Trash2, AlertTriangle } from 'lucide-react'
 import { useStore } from '../store/useStore';
 import type { Habit } from '../store/data';
 import { cn } from '../lib/utils';
-import { dayKey, streakFromDays, isMilestone } from '../lib/streak';
-import { celebrate, bigCelebrate } from '../lib/celebrate';
+import { dayKey, streakFromDays } from '../lib/streak';
 import { pop } from '../lib/motion';
 import { PageHeader, ProgressBar, EmptyState } from '../components/ui';
 
@@ -39,17 +38,7 @@ export default function Habits() {
   const progress = dueToday.length ? Math.round((doneToday / dueToday.length) * 100) : 0;
 
   const handleToggle = (h: Habit) => {
-    const days = logsByHabit.get(h.id) ?? new Set<string>();
-    const wasDone = days.has(today);
     toggleHabitToday(h.id);
-    if (!wasDone) {
-      const next = new Set(days);
-      next.add(today);
-      const streak = streakFromDays(next).streak;
-      const clearedAll = doneToday + 1 >= dueToday.length && dueToday.length > 0;
-      if (isMilestone(streak) || clearedAll) bigCelebrate();
-      else celebrate();
-    }
   };
 
   return (
@@ -72,7 +61,7 @@ export default function Habits() {
           </div>
           <ProgressBar value={progress} />
           {progress === 100 && (
-            <p className="text-xs text-success font-medium mt-2">All habits done today. 🎉</p>
+            <p className="text-xs text-success font-medium mt-2">All habits done today.</p>
           )}
         </div>
       )}
@@ -150,7 +139,7 @@ function HabitRow({
         className={cn(
           'w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
           done
-            ? 'bg-accent border-accent text-white shadow-[0_0_0_4px_var(--accent-soft)]'
+            ? 'bg-accent border-accent text-[var(--accent-text)] shadow-[0_0_0_4px_var(--accent-soft)]'
             : due
               ? 'border-ink-subtle text-transparent hover:border-accent'
               : 'border-border text-transparent opacity-50',
@@ -180,7 +169,7 @@ function HabitRow({
                 title={d.key}
                 className={cn(
                   'w-3.5 h-3.5 rounded-[4px] flex items-center justify-center text-[7px] font-bold',
-                  d.hit ? 'bg-accent text-white' : 'bg-elevated text-ink-subtle',
+                  d.hit ? 'bg-accent text-[var(--accent-text)]' : 'bg-elevated text-ink-subtle',
                 )}
               >
                 {WEEKDAYS[d.weekday]}
@@ -275,7 +264,7 @@ function AddHabit({ onAdd }: { onAdd: (h: Partial<Habit> & { name: string }) => 
                 className={cn(
                   'w-7 h-7 rounded-md text-xs font-medium transition-colors',
                   daysOfWeek.includes(i)
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent text-[var(--accent-text)]'
                     : 'bg-elevated text-ink-muted hover:text-ink',
                 )}
               >
