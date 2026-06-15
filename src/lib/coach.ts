@@ -10,6 +10,7 @@
 import { startOfDay, differenceInCalendarDays } from 'date-fns';
 import type { Phase, TodoTask, Idea, FocusSession, Habit, HabitLog } from '../store/data';
 import { dayKey } from './streak';
+import { countRoadmap } from './roadmap';
 
 export interface CoachState {
   phases: Phase[];
@@ -21,6 +22,82 @@ export interface CoachState {
   pomodoro: { focusMins: number };
   habits: Habit[];
   habitLog: HabitLog[];
+  targetDate: string;
+}
+
+// ---- Goal-drift / pace monitoring ---------------------------------------
+export interface Briefing {
+  status: 'ahead' | 'on-track' | 'behind' | 'idle';
+  headline: string;
+  detail: string;
+  expectedPct: number;
+  actualPct: number;
+  daysLeft: number;
+  weeksBehind: number;
+}
+
+// Compares how far through the timeline you are vs. how much of the roadmap is
+// actually done — the heart of the "is this person on track?" monitoring.
+export function getBriefing(state: CoachState, now = new Date()): Briefing {
+  const roadmap = countRoadmap(state.phases);
+  const target = new Date(state.targetDate);
+  const daysLeft = Math.max(0, Math.ceil((target.getTime() - now.getTime()) / 86400000));
+  const actualPct = roadmap.percent;
+
+  if (roadmap.total === 0) {
+    return {
+      status: 'idle',
+      headline: 'Set up your roadmap',
+      detail: 'Import or build a roadmap so I can track your pace to the goal.',
+      expectedPct: 0,
+      actualPct,
+      daysLeft,
+      weeksBehind: 0,
+    };
+  }
+
+  // Infer the journey start from the earliest signal we have.
+  let start = Infinity;
+  for (const t of state.tasks) if (t.createdAt) start = Math.min(start, Date.parse(t.createdAt));
+  for (const a of state.activityHistory) start = Math.min(start, Date.parse(a.date));
+  for (const f of state.focusSessions) start = Math.min(start, Date.parse(f.date));
+  if (!isFinite(start)) start = now.getTime();
+
+  const total = target.getTime() - start;
+  if (total <= 0) {
+    const behind = actualPct < 100;
+    return {
+      status: behind ? 'behind' : 'ahead',
+      headline: behind ? `Target date reached — ${actualPct}% done` : 'Goal complete 🎉',
+      detail: `${actualPct}% of your roadmap is finished.`,
+      expectedPct: 100,
+      actualPct,
+      daysLeft,
+      weeksBehind: 0,
+    };
+  }
+
+  const elapsed = Math.min(Math.max(now.getTime() - start, 0), total);
+  const expectedPct = (elapsed / total) * 100;
+  const diff = actualPct - expectedPct;
+  const status: Briefing['status'] = diff >= 5 ? 'ahead' : diff >= -8 ? 'on-track' : 'behind';
+
+  let weeksBehind = 0;
+  if (status === 'behind') {
+    const timeForActual = start + (actualPct / 100) * total;
+    weeksBehind = Math.max(0, (now.getTime() - timeForActual) / (7 * 86400000));
+  }
+
+  const headline =
+    status === 'ahead'
+      ? "You're ahead of schedule 🚀"
+      : status === 'on-track'
+        ? "You're on track"
+        : `You're ~${weeksBehind < 2 ? weeksBehind.toFixed(1) : Math.round(weeksBehind)} week${weeksBehind >= 2 ? 's' : ''} behind`;
+
+  const detail = `${actualPct}% done vs ~${Math.round(expectedPct)}% expected by now · ${daysLeft} days to target`;
+
+  return { status, headline, detail, expectedPct, actualPct, daysLeft, weeksBehind };
 }
 
 export interface CoachProfile {
@@ -236,6 +313,21 @@ export function getSuggestions(state: CoachState, profile: CoachProfile, now = n
       actionLabel: `Start ${state.pomodoro.focusMins}-min focus`,
       action: { kind: 'navigate', to: '/focus' },
       score: 72,
+    });
+  }
+
+  // 4b. Goal drift — falling behind the pace to the target date
+  const briefing = getBriefing(state, now);
+  if (briefing.status === 'behind') {
+    candidates.push({
+      id: 'drift',
+      title: briefing.headline,
+      reason: `${briefing.detail}. Close the gap with a roadmap task today.`,
+      icon: 'target',
+      tone: 'urgent',
+      actionLabel: 'Open roadmap',
+      action: { kind: 'navigate', to: '/roadmap' },
+      score: 88,
     });
   }
 
