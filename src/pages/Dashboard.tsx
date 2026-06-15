@@ -16,6 +16,8 @@ import { cn } from '../lib/utils';
 import { countRoadmap } from '../lib/roadmap';
 import { buildProfile, getSuggestions } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
+import { celebrate, bigCelebrate } from '../lib/celebrate';
+import { isMilestone } from '../lib/streak';
 import { ProgressBar, PriorityDot } from '../components/ui';
 import { CoachCard } from '../components/Coach';
 
@@ -41,6 +43,8 @@ export default function Dashboard() {
     focusSessions,
     ideas,
     pomodoro,
+    habits,
+    habitLog,
     addIdea,
   } = useStore();
 
@@ -53,9 +57,11 @@ export default function Dashboard() {
       activityHistory,
       streak,
       pomodoro,
+      habits,
+      habitLog,
     };
     return getSuggestions(state, buildProfile(state));
-  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro]);
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog]);
 
   const [quickTask, setQuickTask] = useState('');
   const [quickIdea, setQuickIdea] = useState('');
@@ -81,6 +87,16 @@ export default function Dashboard() {
   const doneCount = todaysTasks.filter((t) => t.status === 'done').length;
   const progress = todaysTasks.length ? Math.round((doneCount / todaysTasks.length) * 100) : 0;
 
+  const handleComplete = (t: (typeof todaysTasks)[number]) => {
+    const willComplete = t.status === 'doing';
+    cycleTaskStatus(t.id);
+    if (willComplete) {
+      // Clearing the whole day earns a bigger celebration.
+      if (todaysTasks.length > 0 && doneCount + 1 >= todaysTasks.length) bigCelebrate();
+      else celebrate();
+    }
+  };
+
   const focusToday = useMemo(
     () =>
       focusSessions
@@ -91,6 +107,16 @@ export default function Dashboard() {
 
   const roadmap = useMemo(() => countRoadmap(phases), [phases]);
   const todayLogged = activityHistory.some((l) => l.date === todayStr);
+
+  const handleLogDay = (type: 'full' | 'minimum') => {
+    const wasLogged = todayLogged;
+    toggleLogDay(type);
+    if (!wasLogged) {
+      const s = useStore.getState().streak;
+      if (isMilestone(s)) bigCelebrate();
+      else celebrate();
+    }
+  };
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,7 +203,7 @@ export default function Dashboard() {
                   className="group card card-hover flex items-center gap-3 px-3 py-2.5"
                 >
                   <button
-                    onClick={() => cycleTaskStatus(task.id)}
+                    onClick={() => handleComplete(task)}
                     className={cn(
                       'w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0',
                       task.status === 'done'
@@ -226,13 +252,13 @@ export default function Dashboard() {
           <div className="card p-4">
             <h3 className="section-label mb-3">Daily log</h3>
             <button
-              onClick={() => toggleLogDay('full')}
+              onClick={() => handleLogDay('full')}
               className={cn('btn w-full', todayLogged ? 'btn-secondary' : 'btn-primary')}
             >
               {todayLogged ? '✓ Day locked in' : 'Mark day complete'}
             </button>
             <button
-              onClick={() => toggleLogDay('minimum')}
+              onClick={() => handleLogDay('minimum')}
               className="btn btn-ghost w-full mt-1.5 text-xs"
             >
               Just did the minimum

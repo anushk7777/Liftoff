@@ -8,7 +8,8 @@
 // device and there is no external API.
 // =========================================================================
 import { startOfDay, differenceInCalendarDays } from 'date-fns';
-import type { Phase, TodoTask, Idea, FocusSession } from '../store/data';
+import type { Phase, TodoTask, Idea, FocusSession, Habit, HabitLog } from '../store/data';
+import { dayKey } from './streak';
 
 export interface CoachState {
   phases: Phase[];
@@ -18,6 +19,8 @@ export interface CoachState {
   activityHistory: { date: string; type: string }[];
   streak: number;
   pomodoro: { focusMins: number };
+  habits: Habit[];
+  habitLog: HabitLog[];
 }
 
 export interface CoachProfile {
@@ -273,6 +276,33 @@ export function getSuggestions(state: CoachState, profile: CoachProfile, now = n
       actionLabel: 'Open tasks',
       action: { kind: 'navigate', to: '/tasks' },
       score: 60,
+    });
+  }
+
+  // 6b. Habits still due today
+  const todayKey = dayKey(now);
+  const dueHabits = state.habits.filter(
+    (h) =>
+      !h.archived &&
+      (h.cadence === 'daily' || !h.daysOfWeek?.length || h.daysOfWeek.includes(now.getDay())),
+  );
+  const doneHabitIds = new Set(
+    state.habitLog.filter((l) => l.date === todayKey).map((l) => l.habitId),
+  );
+  const undoneHabits = dueHabits.filter((h) => !doneHabitIds.has(h.id));
+  if (undoneHabits.length) {
+    candidates.push({
+      id: 'habits',
+      title:
+        undoneHabits.length === 1
+          ? `Habit: ${trim(undoneHabits[0].name)}`
+          : `${undoneHabits.length} habits left today`,
+      reason: 'Consistency compounds — keep the chain alive.',
+      icon: 'zap',
+      tone: 'win',
+      actionLabel: 'Open habits',
+      action: { kind: 'navigate', to: '/habits' },
+      score: 74 + (hour >= 18 ? 8 : 0),
     });
   }
 

@@ -8,9 +8,12 @@ import {
   Timer,
   Target,
   Sparkles,
+  Bell,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { requestNotificationPermission, notificationPermission } from '../lib/reminders';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 
@@ -30,6 +33,7 @@ export default function Settings() {
   } = useStore();
 
   const [importStatus, setImportStatus] = useState('');
+  const [reminders, setReminders] = useState(() => notificationPermission() === 'granted');
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,10 +121,36 @@ export default function Settings() {
           </div>
         </Section>
 
+        {/* Reminders */}
+        <Section title="Reminders" icon={<Bell className="w-4 h-4" />}>
+          <Row
+            label="Task reminders"
+            desc="Notify me when a scheduled task is due (while Liftoff is open)."
+          >
+            <Toggle
+              checked={reminders}
+              onChange={async (v) => {
+                if (v) setReminders(await requestNotificationPermission());
+                else setReminders(false);
+              }}
+            />
+          </Row>
+          {notificationPermission() === 'denied' && (
+            <p className="text-xs text-danger">
+              Notifications are blocked in your browser settings — enable them there first.
+            </p>
+          )}
+          <p className="text-xs text-ink-subtle">
+            For alarms when the app is closed, use “Add to calendar” when scheduling a task.
+          </p>
+        </Section>
+
         {/* Data */}
         <Section title="Data">
           <p className="text-xs text-ink-subtle mb-3">
-            Your data syncs to the cloud automatically. You can also keep a local backup.
+            {isSupabaseConfigured
+              ? 'Saved on this device and synced to the cloud automatically. You can also keep a local backup.'
+              : 'Saved automatically on this device. Cloud sync is off (no credentials). Keep a local backup to move between devices.'}
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <button onClick={handleExport} className="btn btn-secondary flex-1">

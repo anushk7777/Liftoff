@@ -25,7 +25,7 @@ export default function PanicButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 w-11 h-11 rounded-full bg-surface border border-border shadow-md text-ink-muted hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
+        className="fixed bottom-20 left-4 md:bottom-5 md:left-5 z-40 w-11 h-11 rounded-full bg-surface border border-border shadow-md text-ink-muted hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
         aria-label="Feeling like quitting?"
         title="Feeling stuck?"
       >

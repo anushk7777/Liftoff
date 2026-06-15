@@ -19,6 +19,7 @@ import {
   BookOpen,
   Timer,
   Target,
+  ChevronDown,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
@@ -117,35 +118,42 @@ export default function Stats() {
           icon={<Timer className="w-4 h-4" />}
         />
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        <StatCard label="Tasks done" value={evidence.tasksDone} icon={<Code className="w-4 h-4" />} />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+        <StatCard label="Problems solved" value={evidence.problems} icon={<Code className="w-4 h-4" />} />
+        <StatCard label="Sections completed" value={evidence.sections} icon={<BookOpen className="w-4 h-4" />} />
         <StatCard label="Projects shipped" value={evidence.projects} icon={<Trophy className="w-4 h-4" />} />
+        <StatCard label="Tasks done" value={evidence.tasksDone} icon={<Code className="w-4 h-4" />} />
         <StatCard label="Days active" value={evidence.activeDays} icon={<Flame className="w-4 h-4" />} />
         <StatCard label="Focus this week" value={`${focusWeek}m`} icon={<Timer className="w-4 h-4" />} />
       </div>
 
-      {/* Evidence-based counters: derived from completed work, with an option
-          to log reps you did outside the app. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
-        <Counter
-          icon={<Code className="w-5 h-5" />}
-          label="Problems solved"
-          value={evidence.problems}
-          onInc={() => incrementProblems(1)}
-          onDec={() => incrementProblems(-1)}
-        />
-        <Counter
-          icon={<BookOpen className="w-5 h-5" />}
-          label="Sections completed"
-          value={evidence.sections}
-          onInc={() => incrementSections(1)}
-          onDec={() => incrementSections(-1)}
-        />
-      </div>
-      <p className="text-xs text-ink-subtle mb-8">
-        Auto-counted from completed DSA / course tasks and roadmap items. Use +/− only to log reps
-        done outside Liftoff.
-      </p>
+      {/* Manual log tucked away — the headline numbers above are evidence-based. */}
+      <details className="card p-4 mb-8">
+        <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-ink">
+          <span>Log reps done outside Liftoff</span>
+          <ChevronDown className="w-4 h-4 text-ink-subtle" />
+        </summary>
+        <p className="text-xs text-ink-subtle mt-2 mb-3">
+          Problems and sections auto-count from your completed tasks and roadmap. Use these only to
+          add reps done elsewhere (e.g. LeetCode).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Counter
+            icon={<Code className="w-5 h-5" />}
+            label="Manual problems"
+            value={problemsSolved}
+            onInc={() => incrementProblems(1)}
+            onDec={() => incrementProblems(-1)}
+          />
+          <Counter
+            icon={<BookOpen className="w-5 h-5" />}
+            label="Manual sections"
+            value={sectionsCompleted}
+            onInc={() => incrementSections(1)}
+            onDec={() => incrementSections(-1)}
+          />
+        </div>
+      </details>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">

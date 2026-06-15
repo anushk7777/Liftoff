@@ -1,6 +1,31 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { animate } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useReducedMotion } from '../lib/motion';
+
+// Smoothly counts from the previous value to the new one.
+export function AnimatedNumber({ value }: { value: number }) {
+  const rm = useReducedMotion();
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+
+  useEffect(() => {
+    if (rm || prev.current === value) {
+      prev.current = value;
+      return;
+    }
+    const controls = animate(prev.current, value, {
+      duration: 0.6,
+      ease: [0.21, 1, 0.4, 1],
+      onUpdate: (v) => setDisplay(v),
+    });
+    prev.current = value;
+    return () => controls.stop();
+  }, [value, rm]);
+
+  return <>{Math.round(rm ? value : display)}</>;
+}
 
 export function PageHeader({
   title,
@@ -61,7 +86,9 @@ export function StatCard({
         <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">{label}</p>
         {icon && <span className="text-ink-subtle">{icon}</span>}
       </div>
-      <p className="font-display text-2xl font-bold text-ink mt-2">{value}</p>
+      <p className="font-display text-2xl font-bold text-ink mt-2">
+        {typeof value === 'number' ? <AnimatedNumber value={value} /> : value}
+      </p>
     </div>
   );
 }

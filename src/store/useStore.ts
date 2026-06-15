@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type {
   Phase,
   TodoTask,
@@ -9,9 +10,12 @@ import type {
   PomodoroSettings,
   Priority,
   Status,
+  Habit,
+  HabitLog,
 } from './data';
 import { initialRoadmap, defaultPomodoro } from './data';
-import { startOfDay, differenceInCalendarDays } from 'date-fns';
+import { startOfDay } from 'date-fns';
+import { dayKey, streakFromDays } from '../lib/streak';
 
 export interface ActivityLog {
   date: string; // ISO start-of-day
@@ -69,6 +73,14 @@ interface AppState {
   deleteNote: (id: string) => void;
   togglePinNote: (id: string) => void;
 
+  // Habits
+  habits: Habit[];
+  habitLog: HabitLog[];
+  addHabit: (habit: Partial<Habit> & { name: string }) => void;
+  updateHabit: (id: string, updates: Partial<Habit>) => void;
+  deleteHabit: (id: string) => void;
+  toggleHabitToday: (id: string) => void;
+
   // Focus / Pomodoro
   pomodoro: PomodoroSettings;
   setPomodoro: (updates: Partial<PomodoroSettings>) => void;
@@ -82,7 +94,6 @@ interface AppState {
   activityHistory: ActivityLog[];
   problemsSolved: number;
   sectionsCompleted: number;
-  projectsShipped: number;
   incrementProblems: (delta?: number) => void;
   incrementSections: (delta?: number) => void;
 
@@ -105,32 +116,41 @@ const getDeviceId = () => {
 
 const NON_PERSISTED = new Set(['_initialized', 'deviceId']);
 
-export const useStore = create<AppState>()((set, get) => ({
-  _initialized: false,
-  deviceId: getDeviceId(),
-  setInitialized: (val) => set({ _initialized: val }),
+export const useStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      _initialized: false,
+      deviceId: getDeviceId(),
+      setInitialized: (val) => set({ _initialized: val }),
 
-  loadFromDB: async () => {
-    const state = get();
-    try {
-      const { data } = await supabase
-        .from('user_data')
-        .select('data')
-        .eq('id', state.deviceId)
-        .single();
+      loadFromDB: async () => {
+        // Local persistence is the source of truth. Only pull from the cloud
+        // when Supabase is actually configured.
+        if (!isSupabaseConfigured) {
+          set({ _initialized: true });
+          get().recalculateStreak();
+          return;
+        }
+        const state = get();
+        try {
+          const { data } = await supabase
+            .from('user_data')
+            .select('data')
+            .eq('id', state.deviceId)
+            .single();
 
-      if (data && data.data) {
-        const loaded = migrate(data.data);
-        set({ ...loaded, _initialized: true, deviceId: state.deviceId });
-      } else {
-        set({ _initialized: true });
-      }
-    } catch (err) {
-      console.error('Failed to load from Supabase:', err);
-      set({ _initialized: true });
-    }
-    get().recalculateStreak();
-  },
+          if (data && data.data) {
+            const loaded = migrate(data.data);
+            set({ ...loaded, _initialized: true, deviceId: state.deviceId });
+          } else {
+            set({ _initialized: true });
+          }
+        } catch (err) {
+          console.error('Failed to load from Supabase:', err);
+          set({ _initialized: true });
+        }
+        get().recalculateStreak();
+      },
 
   // ---- Settings ----
   targetDate: '2026-12-01',
@@ -191,6 +211,7 @@ export const useStore = create<AppState>()((set, get) => ({
           category: task.category,
           estimate: task.estimate,
           dueDate: task.dueDate,
+          scheduledAt: task.scheduledAt,
           createdAt: nowISO(),
           completedAt: task.status === 'done' ? nowISO() : undefined,
           sourceRoadmap: task.sourceRoadmap,
@@ -302,6 +323,45 @@ export const useStore = create<AppState>()((set, get) => ({
       notes: state.notes.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n)),
     })),
 
+  // ---- Habits ----
+  habits: [],
+  habitLog: [],
+  addHabit: (habit) =>
+    set((state) => ({
+      habits: [
+        {
+          id: uid(),
+          name: habit.name,
+          emoji: habit.emoji,
+          cadence: habit.cadence || 'daily',
+          daysOfWeek: habit.daysOfWeek,
+          scheduledTime: habit.scheduledTime,
+          createdAt: nowISO(),
+          archived: false,
+        },
+        ...state.habits,
+      ],
+    })),
+  updateHabit: (id, updates) =>
+    set((state) => ({
+      habits: state.habits.map((h) => (h.id === id ? { ...h, ...updates } : h)),
+    })),
+  deleteHabit: (id) =>
+    set((state) => ({
+      habits: state.habits.filter((h) => h.id !== id),
+      habitLog: state.habitLog.filter((l) => l.habitId !== id),
+    })),
+  toggleHabitToday: (id) =>
+    set((state) => {
+      const today = dayKey(new Date());
+      const done = state.habitLog.some((l) => l.habitId === id && l.date === today);
+      return {
+        habitLog: done
+          ? state.habitLog.filter((l) => !(l.habitId === id && l.date === today))
+          : [...state.habitLog, { habitId: id, date: today }],
+      };
+    }),
+
   // ---- Focus / Pomodoro ----
   pomodoro: defaultPomodoro,
   setPomodoro: (updates) => set((s) => ({ pomodoro: { ...s.pomodoro, ...updates } })),
@@ -321,7 +381,6 @@ export const useStore = create<AppState>()((set, get) => ({
   activityHistory: [],
   problemsSolved: 0,
   sectionsCompleted: 0,
-  projectsShipped: 0,
   incrementProblems: (delta = 1) =>
     set((s) => ({ problemsSolved: Math.max(0, s.problemsSolved + delta) })),
   incrementSections: (delta = 1) =>
@@ -343,38 +402,10 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   recalculateStreak: () => {
-    const state = get();
-    if (state.activityHistory.length === 0) {
-      set({ streak: 0, freezeAvailable: true });
-      return;
-    }
-    const sorted = [...state.activityHistory].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-    let currentStreak = 0;
-    let maxStreak = state.longestStreak;
-    let freeze = true;
-    const firstDate = new Date(sorted[0].date);
-    const today = startOfDay(new Date());
-    const totalDays = differenceInCalendarDays(today, firstDate);
-    let hi = 0;
-    for (let i = 0; i <= totalDays; i++) {
-      const d = new Date(firstDate);
-      d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString();
-      if (hi < sorted.length && sorted[hi].date === dateStr) {
-        currentStreak++;
-        hi++;
-      } else if (freeze) {
-        currentStreak++;
-        freeze = false;
-      } else {
-        currentStreak = 0;
-        freeze = true;
-      }
-      if (currentStreak > maxStreak) maxStreak = currentStreak;
-    }
-    set({ streak: currentStreak, longestStreak: maxStreak, freezeAvailable: freeze });
+    const { activityHistory, longestStreak } = get();
+    const days = new Set(activityHistory.map((l) => dayKey(l.date)));
+    const { streak, freezeAvailable } = streakFromDays(days);
+    set({ streak, longestStreak: Math.max(longestStreak, streak), freezeAvailable });
   },
 
   exportData: () => {
@@ -396,7 +427,26 @@ export const useStore = create<AppState>()((set, get) => ({
       console.error('Failed to parse import string', e);
     }
   },
-}));
+    }),
+    {
+      name: 'liftoff',
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      // Persist everything except runtime-only fields and functions.
+      partialize: (s) =>
+        Object.fromEntries(
+          Object.entries(s).filter(([k, v]) => typeof v !== 'function' && !NON_PERSISTED.has(k)),
+        ) as unknown as AppState,
+      migrate: (persisted) => migrate(persisted as Record<string, unknown>) as unknown as AppState,
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setInitialized(true);
+          state.recalculateStreak();
+        }
+      },
+    },
+  ),
+);
 
 // Set a specific roadmap task's completed flag (used when a linked daily task
 // is completed). Returns a new phases array; does nothing if not found.
@@ -461,15 +511,18 @@ function migrate(data: Record<string, unknown>): Record<string, unknown> {
   if (!Array.isArray(out.ideas)) out.ideas = [];
   if (!Array.isArray(out.notes)) out.notes = [];
   if (!Array.isArray(out.focusSessions)) out.focusSessions = [];
+  if (!Array.isArray(out.habits)) out.habits = [];
+  if (!Array.isArray(out.habitLog)) out.habitLog = [];
   if (!out.pomodoro) out.pomodoro = defaultPomodoro;
 
   return out;
 }
 
-// Debounced cloud sync
+// Debounced cloud sync — only when Supabase is configured. Local persistence
+// (zustand persist) handles offline-first saving on its own.
 let syncTimeout: ReturnType<typeof setTimeout>;
 useStore.subscribe((state) => {
-  if (!state._initialized) return;
+  if (!isSupabaseConfigured || !state._initialized) return;
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(async () => {
     try {

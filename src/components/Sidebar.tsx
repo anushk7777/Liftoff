@@ -13,15 +13,20 @@ import {
   Moon,
   Sun,
   Sparkles,
+  Search,
+  Repeat,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { differenceInCalendarDays } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
+import { springSoft } from '../lib/motion';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/coach', label: 'Coach', icon: Sparkles },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/habits', label: 'Habits', icon: Repeat },
   { to: '/focus', label: 'Focus', icon: Timer },
   { to: '/brain-dump', label: 'Brain Dump', icon: Lightbulb },
   { to: '/roadmap', label: 'Roadmap', icon: Map },
@@ -32,10 +37,12 @@ export default function Sidebar({
   collapsed,
   onToggle,
   onNavigate,
+  onOpenSearch,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
+  onOpenSearch?: () => void;
 }) {
   const { targetDate, theme, toggleTheme } = useStore();
   const daysLeft = Math.max(0, differenceInCalendarDays(new Date(targetDate), new Date()));
@@ -56,7 +63,7 @@ export default function Sidebar({
           {!collapsed && (
             <div className="leading-tight">
               <p className="font-display font-bold text-[15px] tracking-tight text-ink">Liftoff</p>
-              <p className="text-[10px] text-ink-subtle font-medium">{daysLeft} days to goal</p>
+              <p className="text-[10px] text-ink-subtle font-medium">Mission control</p>
             </div>
           )}
         </div>
@@ -66,6 +73,26 @@ export default function Sidebar({
           aria-label="Toggle sidebar"
         >
           {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* Search / command palette */}
+      <div className="px-2 mb-2">
+        <button
+          onClick={onOpenSearch}
+          title="Search (Ctrl/⌘ K)"
+          className={cn(
+            'w-full flex items-center gap-2 rounded-lg border border-border bg-bg text-ink-subtle hover:text-ink hover:border-border-strong transition-colors',
+            collapsed ? 'justify-center p-2' : 'px-2.5 py-2',
+          )}
+        >
+          <Search className="w-4 h-4 shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="text-sm flex-1 text-left">Search…</span>
+              <kbd className="text-[10px] border border-border rounded px-1 py-0.5">⌘K</kbd>
+            </>
+          )}
         </button>
       </div>
 
@@ -89,11 +116,22 @@ export default function Sidebar({
             onClick={onNavigate}
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
-              cn('sidebar-item', isActive && 'active', collapsed && 'justify-center px-0')
+              cn('sidebar-item relative', isActive && 'active', collapsed && 'justify-center px-0')
             }
           >
-            <Icon className="w-[18px] h-[18px] shrink-0" />
-            {!collapsed && <span className="truncate">{label}</span>}
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <motion.span
+                    layoutId="navPill"
+                    className="absolute inset-0 rounded-[7px] bg-accent-soft"
+                    transition={springSoft}
+                  />
+                )}
+                <Icon className="w-[18px] h-[18px] shrink-0 relative z-10" />
+                {!collapsed && <span className="truncate relative z-10">{label}</span>}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -117,7 +155,11 @@ export default function Sidebar({
           onClick={onNavigate}
           title={collapsed ? 'Settings' : undefined}
           className={({ isActive }) =>
-            cn('sidebar-item', isActive && 'active', collapsed && 'justify-center px-0')
+            cn(
+              'sidebar-item',
+              isActive && 'active bg-accent-soft',
+              collapsed && 'justify-center px-0',
+            )
           }
         >
           <Settings className="w-[18px] h-[18px] shrink-0" />
