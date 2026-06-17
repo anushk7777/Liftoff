@@ -53,7 +53,10 @@ export function useReminders() {
       for (const t of tasks) {
         if (t.status === 'done' || !t.scheduledAt) continue;
         const ts = new Date(t.scheduledAt).getTime();
-        if (ts <= now && now - ts < 2 * 60000 && !notified.has(t.id)) {
+        // Fire for any task that's now due and hasn't been alerted yet. The 24h
+        // surfacing window means reopening the app the same day still shows a
+        // missed reminder, without flooding alarms from very old tasks.
+        if (ts <= now && now - ts < 24 * 60 * 60000 && !notified.has(t.id)) {
           // In-app alarm (always)
           window.dispatchEvent(
             new CustomEvent('liftoff:alarm', { detail: { id: t.id, title: t.title } }),

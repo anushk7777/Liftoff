@@ -6,7 +6,6 @@ import { buildProfile, getSuggestions, getBriefing, formatHour } from '../lib/co
 import type { CoachState } from '../lib/coach';
 import { PageHeader, ProgressBar } from '../components/ui';
 import { SuggestionRow } from '../components/Coach';
-import CoachChat from '../components/CoachChat';
 import { useCoachActions } from '../components/useCoachActions';
 
 export default function Coach() {
@@ -83,16 +82,12 @@ export default function Coach() {
         </div>
       </div>
 
-      {/* Conversational Claude coach */}
-      <div className="mb-6">
-        <CoachChat />
-      </div>
-
       {/* How it works */}
       <div className="card p-4 mb-6 flex items-start gap-3 bg-accent-soft/30">
         <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
         <p className="text-sm text-ink-muted">
-          The coach re-trains on your data every time you open it — entirely on this device.
+          Runs entirely on this device — no account, API key, or internet. It re-trains on your own
+          activity each time you open it.
           {learning
             ? ' It’s still getting to know you; complete tasks and run a few focus sessions to sharpen its advice.'
             : ' The more you do, the sharper it gets.'}

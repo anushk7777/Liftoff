@@ -9,18 +9,17 @@ import {
   Circle,
   CircleDot,
   Clock,
+  CalendarPlus,
+  CalendarDays,
 } from 'lucide-react';
 import { format, isToday, isPast, startOfDay } from 'date-fns';
 import { useStore } from '../store/useStore';
 import type { TodoTask, Priority, Status } from '../store/data';
 import { cn } from '../lib/utils';
 import { springSoft } from '../lib/motion';
-import { PageHeader, Modal, PriorityDot, PriorityBadge, EmptyState } from '../components/ui';
-
-const toLocalInput = (d: Date) => {
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-};
+import { downloadTaskIcs, googleCalendarUrl } from '../lib/ics';
+import { PageHeader, Modal, PriorityDot, EmptyState, SegmentedControl } from '../components/ui';
+import DateTimePicker from '../components/DateTimePicker';
 
 type Filter = 'all' | 'todo' | 'doing' | 'done';
 
@@ -219,6 +218,26 @@ function TaskRow({
       </div>
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {task.scheduledAt && (
+          <>
+            <a
+              href={googleCalendarUrl(task.title, task.scheduledAt)}
+              target="_blank"
+              rel="noreferrer"
+              title="Add to Google Calendar (sends email/push reminders)"
+              className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
+            >
+              <CalendarDays className="w-4 h-4" />
+            </a>
+            <button
+              onClick={() => downloadTaskIcs(task.title, task.scheduledAt!)}
+              title="Add to calendar (.ics)"
+              className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
+            >
+              <CalendarPlus className="w-4 h-4" />
+            </button>
+          </>
+        )}
         <button onClick={onEdit} className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover">
           <Pencil className="w-4 h-4" />
         </button>
@@ -245,27 +264,34 @@ function TaskModal({
   onSave: (data: Partial<TodoTask>) => void;
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit task' : 'New task'}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={editing ? 'Edit task' : 'New task'}
+      footer={
+        open ? (
+          <>
+            <button type="button" onClick={onClose} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button type="submit" form="task-form" className="btn btn-primary">
+              {editing ? 'Save changes' : 'Add task'}
+            </button>
+          </>
+        ) : undefined
+      }
+    >
       {/* Remount on open / when switching target so fields initialise from props */}
-      {open && (
-        <TaskForm
-          key={editing?.id ?? 'new'}
-          editing={editing}
-          onClose={onClose}
-          onSave={onSave}
-        />
-      )}
+      {open && <TaskForm key={editing?.id ?? 'new'} editing={editing} onSave={onSave} />}
     </Modal>
   );
 }
 
 function TaskForm({
   editing,
-  onClose,
   onSave,
 }: {
   editing: TodoTask | null;
-  onClose: () => void;
   onSave: (data: Partial<TodoTask>) => void;
 }) {
   const [title, setTitle] = useState(editing?.title ?? '');
@@ -274,10 +300,17 @@ function TaskForm({
   const [status, setStatus] = useState<Status>(editing?.status ?? 'todo');
   const [category, setCategory] = useState(editing?.category ?? '');
   const [estimate, setEstimate] = useState(editing?.estimate ?? '');
-  const [dueDate, setDueDate] = useState(editing?.dueDate ? editing.dueDate.slice(0, 10) : '');
-  const [scheduledAt, setScheduledAt] = useState(
-    editing?.scheduledAt ? toLocalInput(new Date(editing.scheduledAt)) : '',
-  );
+  // Single schedule control (date + time). Prefill from scheduledAt, or from a
+  // legacy due date (at 09:00) so existing tasks keep their date.
+  const [scheduledAt, setScheduledAt] = useState<string>(() => {
+    if (editing?.scheduledAt) return editing.scheduledAt;
+    if (editing?.dueDate) {
+      const d = new Date(editing.dueDate);
+      d.setHours(9, 0, 0, 0);
+      return d.toISOString();
+    }
+    return '';
+  });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,97 +324,69 @@ function TaskForm({
       category: category.trim() || undefined,
       estimate: estimate.trim() || undefined,
       scheduledAt: sched ? sched.toISOString() : undefined,
-      dueDate: sched
-        ? startOfDay(sched).toISOString()
-        : dueDate
-          ? startOfDay(new Date(dueDate)).toISOString()
-          : undefined,
+      dueDate: sched ? startOfDay(sched).toISOString() : undefined,
     });
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-        <input
-          autoFocus
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="What needs to get done?"
-          className="input text-base"
-        />
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes (optional)"
-          rows={2}
-          className="input resize-none"
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Priority">
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as Priority)}
-              className="input"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </Field>
-          <Field label="Status">
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as Status)}
-              className="input"
-            >
-              <option value="todo">To do</option>
-              <option value="doing">In progress</option>
-              <option value="done">Done</option>
-            </select>
-          </Field>
-          <Field label="Category">
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. DSA"
-              className="input"
-            />
-          </Field>
-          <Field label="Estimate">
-            <input
-              value={estimate}
-              onChange={(e) => setEstimate(e.target.value)}
-              placeholder="e.g. 45m"
-              className="input"
-            />
-          </Field>
-          <Field label="Due date">
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="input"
-            />
-          </Field>
-          <Field label="Schedule (time)">
-            <input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              className="input"
-            />
-          </Field>
-        </div>
-        <div className="flex items-center justify-between gap-2 pt-1">
-          {editing ? <PriorityBadge priority={priority} /> : <span />}
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="btn btn-secondary">
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              {editing ? 'Save changes' : 'Add task'}
-            </button>
-          </div>
-        </div>
+    <form id="task-form" onSubmit={submit} className="space-y-5">
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="What needs to get done?"
+        className="input text-base"
+      />
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Notes (optional)"
+        rows={2}
+        className="input resize-none"
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Priority">
+          <SegmentedControl
+            value={priority}
+            onChange={setPriority}
+            options={[
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Med' },
+              { value: 'high', label: 'High' },
+            ]}
+          />
+        </Field>
+        <Field label="Status">
+          <SegmentedControl
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: 'todo', label: 'To do' },
+              { value: 'doing', label: 'Doing' },
+              { value: 'done', label: 'Done' },
+            ]}
+          />
+        </Field>
+        <Field label="Category">
+          <input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="e.g. DSA"
+            className="input"
+          />
+        </Field>
+        <Field label="Estimate">
+          <input
+            value={estimate}
+            onChange={(e) => setEstimate(e.target.value)}
+            placeholder="e.g. 45m"
+            className="input"
+          />
+        </Field>
+      </div>
+      <Field label="Schedule & reminder">
+        <DateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+      </Field>
     </form>
   );
 }

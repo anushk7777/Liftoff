@@ -70,3 +70,26 @@ export function downloadICS(filename: string, content: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+const slugify = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'task';
+
+// One-click .ics download for a scheduled item (calendar app handles the alarm).
+export function downloadTaskIcs(title: string, start: string | Date, durationMins = 30) {
+  downloadICS(`${slugify(title)}.ics`, buildICS({ title, start, durationMins, description: 'Scheduled in Liftoff' }));
+}
+
+// A Google Calendar "add event" link. Google then sends its own email + push
+// reminders — the no-backend way to get email reminders.
+export function googleCalendarUrl(title: string, start: string | Date, durationMins = 30): string {
+  const s = new Date(start);
+  const e = new Date(s.getTime() + durationMins * 60000);
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${fmt(s)}/${fmt(e)}`,
+    details: 'Scheduled in Liftoff',
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}

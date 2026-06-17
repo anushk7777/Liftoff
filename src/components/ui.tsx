@@ -98,33 +98,36 @@ export function Modal({
   onClose,
   title,
   children,
+  footer,
   maxWidth = 'max-w-lg',
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   maxWidth?: string;
 }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
   }, [open, onClose]);
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className={cn(
-          'relative w-full card shadow-lg p-5 animate-rise',
-          maxWidth,
-        )}
-      >
+      {/* Flex column: pinned header + scrollable body + pinned footer, capped
+          height so the actions are always visible (no scroll-to-find). */}
+      <div className={cn('relative w-full card shadow-lg flex flex-col max-h-[88vh] animate-rise', maxWidth)}>
         {title && (
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
             <h2 className="font-display text-lg font-bold text-ink">{title}</h2>
             <button
               onClick={onClose}
@@ -134,7 +137,12 @@ export function Modal({
             </button>
           </div>
         )}
-        {children}
+        <div className="overflow-y-auto px-5 py-5 flex-1 min-h-0">{children}</div>
+        {footer && (
+          <div className="px-5 py-3.5 border-t border-border shrink-0 flex items-center justify-end gap-2">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -180,5 +188,36 @@ export function PriorityBadge({ priority }: { priority: string }) {
     >
       {priority}
     </span>
+  );
+}
+
+// A clean pill toggle — replaces native <select> for small, fixed option sets.
+export function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  className,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex p-0.5 rounded-lg bg-elevated border border-border', className)}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'flex-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors',
+            value === o.value ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
